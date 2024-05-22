@@ -1,12 +1,12 @@
 <?php
 
-namespace VendorName\Skeleton\Commands;
+namespace Rahat1994\SparkcommerceRestRoutes\Commands;
 
 use Illuminate\Console\Command;
 
-class SkeletonCommand extends Command
+class SparkcommerceRestRoutesCommand extends Command
 {
-    public $signature = 'skeleton';
+    public $signature = 'sparkcommerce-rest-routes';
 
     public $description = 'My command';
 

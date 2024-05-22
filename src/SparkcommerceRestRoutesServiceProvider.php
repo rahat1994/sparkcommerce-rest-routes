@@ -1,12 +1,12 @@
 <?php
 
-namespace VendorName\Skeleton;
+namespace Rahat1994\SparkcommerceRestRoutes;
 
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
-use VendorName\Skeleton\Commands\SkeletonCommand;
+use Rahat1994\SparkcommerceRestRoutes\Commands\SparkcommerceRestRoutesCommand;
 
-class SkeletonServiceProvider extends PackageServiceProvider
+class SparkcommerceRestRoutesServiceProvider extends PackageServiceProvider
 {
     public function configurePackage(Package $package): void
     {
@@ -16,10 +16,10 @@ class SkeletonServiceProvider extends PackageServiceProvider
          * More info: https://github.com/spatie/laravel-package-tools
          */
         $package
-            ->name('skeleton')
+            ->name('sparkcommerce-rest-routes')
             ->hasConfigFile()
             ->hasViews()
-            ->hasMigration('create_skeleton_table')
-            ->hasCommand(SkeletonCommand::class);
+            ->hasMigration('create_sparkcommerce-rest-routes_table')
+            ->hasCommand(SparkcommerceRestRoutesCommand::class);
     }
 }

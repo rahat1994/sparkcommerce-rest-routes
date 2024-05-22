@@ -1,5 +1,5 @@
 <?php
 
-use VendorName\Skeleton\Tests\TestCase;
+use Rahat1994\SparkcommerceRestRoutes\Tests\TestCase;
 
 uses(TestCase::class)->in(__DIR__);
