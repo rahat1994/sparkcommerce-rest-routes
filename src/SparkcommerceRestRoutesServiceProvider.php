@@ -19,6 +19,7 @@ class SparkcommerceRestRoutesServiceProvider extends PackageServiceProvider
             ->name('sparkcommerce-rest-routes')
             ->hasConfigFile()
             ->hasViews()
+            ->hasRoute('api')
             ->hasMigration('create_sparkcommerce-rest-routes_table')
             ->hasCommand(SparkcommerceRestRoutesCommand::class);
     }
