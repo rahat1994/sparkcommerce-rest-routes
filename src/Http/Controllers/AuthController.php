@@ -17,6 +17,8 @@ class AuthController extends Controller
             'device_name' => 'required',
         ]);
 
+
+
         if (Auth::attempt($request->only('email', 'password'))) {
 
             $response = [
@@ -37,8 +39,9 @@ class AuthController extends Controller
             'name' => 'required',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|alpha_num|min:6',
+            'device_name' => 'required',
         ]);
-
+        // dd($request->all());
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
