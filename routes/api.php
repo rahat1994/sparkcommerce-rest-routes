@@ -1,6 +1,6 @@
 <?php
 
-use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
 use Rahat1994\SparkcommerceRestRoutes\Http\Controllers\AuthController;
 
 Route::group(['prefix' => 'sc/v1'], function () {
@@ -12,7 +12,6 @@ Route::group(['prefix' => 'sc/v1'], function () {
         Route::get('/me', [AuthController::class, 'me']);
         Route::post('/logout', [AuthController::class, 'logout']);
     });
-    
 });
 // Route::post('/login', [AuthController::class, 'login']);
 // Route::post('/register', [AuthController::class, 'register']);
