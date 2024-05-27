@@ -6,7 +6,9 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
-
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rules\Password as PasswordRule;
 class AuthController extends Controller
 {
     public function login(Request $request)
@@ -38,7 +40,14 @@ class AuthController extends Controller
         $request->validate([
             'name' => 'required',
             'email' => 'required|email|unique:users,email',
-            'password' => 'required|alpha_num|min:6',
+            'password' => [
+                'required',
+                PasswordRule::min(8)
+                    ->mixedCase()
+                    ->numbers()
+                    ->symbols()
+                    ->uncompromised(),
+            ],
             'device_name' => 'required',
         ]);
         // dd($request->all());
@@ -84,18 +93,18 @@ class AuthController extends Controller
             'password' => 'required|confirmed|min:6',
         ]);
 
-        // $status = Password::reset(
-        //     $request->only('email', 'password', 'password_confirmation', 'token'),
-        //     function ($user, $password) {
-        //         $user->forceFill([
-        //             'password' => Hash::make($password)
-        //         ])->save();
-        //     }
-        // );
+        $status = Password::reset(
+            $request->only('email', 'password', 'password_confirmation', 'token'),
+            function ($user, $password) {
+                $user->forceFill([
+                    'password' => Hash::make($password)
+                ])->save();
+            }
+        );
 
-        // return $status == Password::PASSWORD_RESET
-        //             ? response()->json(['message' => __($status)], 200)
-        //             : response()->json(['message' => __($status)], 400);
+        return $status == Password::PASSWORD_RESET
+                    ? response()->json(['message' => __($status)], 200)
+                    : response()->json(['message' => __($status)], 400);
     }
 
     public function confirmEmail(Request $request)
