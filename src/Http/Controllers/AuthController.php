@@ -73,16 +73,16 @@ class AuthController extends Controller
     public function forgotPassword(Request $request)
     {
         $request->validate([
-            'email' => 'required|email|exists:users,email',
+            'email' => 'required|email',
         ]);
 
-        // $status = Password::sendResetLink(
-        //     $request->only('email')
-        // );
+        $status = Password::sendResetLink(
+            $request->only('email')
+        );
 
-        // return $status === Password::RESET_LINK_SENT
-        //             ? response()->json(['message' => __($status)], 200)
-        //             : response()->json(['message' => __($status)], 400);
+        return $status === Password::RESET_LINK_SENT
+                    ? response()->json(['message' => __($status)], 200)
+                    : response()->json(['message' => __($status)], 400);
     }
 
     public function resetPassword(Request $request)
@@ -95,7 +95,7 @@ class AuthController extends Controller
 
         $status = Password::reset(
             $request->only('email', 'password', 'password_confirmation', 'token'),
-            function ($user, $password) {
+            function (User $user,string $password) {
                 $user->forceFill([
                     'password' => Hash::make($password)
                 ])->save();
