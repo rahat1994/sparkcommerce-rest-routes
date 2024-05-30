@@ -1,6 +1,6 @@
 <?php
 
-use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
 use Rahat1994\SparkcommerceRestRoutes\Http\Controllers\AuthController;
 
 Route::group(['prefix' => 'sc/v1'], function () {
