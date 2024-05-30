@@ -11,6 +11,9 @@ Route::group(['prefix' => 'sc/v1'], function () {
 
     Route::group(['middleware' => ['auth:sanctum']], function () {
         Route::get('/me', [AuthController::class, 'me']);
+        Route::post('/confirm-password', [AuthController::class, 'confirmPassword']);
+        Route::post('/update-password', [AuthController::class, 'updatePassword']);
+        Route::post('/update-profile ', [AuthController::class, 'updateProfile']);
         Route::post('/logout', [AuthController::class, 'logout']);
     });
 });

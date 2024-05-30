@@ -107,6 +107,25 @@ class AuthController extends Controller
                     : response()->json(['message' => __($status)], 400);
     }
 
+    public function confirmPassword(Request $request)
+    {
+        $request->validate([
+            'password' => 'required',
+        ]);
+
+        if (!Hash::check($request->password, $request->user()->password)) {
+            return response()->json([
+                'message' => 'The provided password does not match our records.'
+            ], 400);
+        }
+
+        return response()->json([
+            'message' => 'Password confirmed'
+        ], 200);
+    }
+
+
+
     public function confirmEmail(Request $request)
     {
         $request->validate([
@@ -127,12 +146,37 @@ class AuthController extends Controller
     {
         $request->validate([
             'name' => 'required',
-            'email' => 'required|email|unique:users,email,' . $request->user()->id,
         ]);
 
         $user = $request->user();
         $user->name = $request->name;
-        $user->email = $request->email;
+        $user->save();
+
+        return response()->json($user, 200);
+    }
+
+    public function updatePassword(Request $request)
+    {
+        $request->validate([
+            'current_password' => 'required',
+            'password' => [
+                'required',
+                PasswordRule::min(8)
+                    ->mixedCase()
+                    ->numbers()
+                    ->symbols()
+                    ->uncompromised(),
+            ],
+        ]);
+
+        if (!Hash::check($request->current_password, $request->user()->password)) {
+            return response()->json([
+                'message' => 'The provided password does not match our records.'
+            ], 400);
+        }
+
+        $user = $request->user();
+        $user->password = bcrypt($request->password);
         $user->save();
 
         return response()->json($user, 200);
