@@ -11,10 +11,18 @@ class SCProductResource extends JsonResource
         return [
             'name' => $this->name,
             'slug' => $this->slug,
-            'background_image' => 'https://fastly.picsum.photos/id/63/5000/2813.jpg',
-            'logo' => 'https://fastly.picsum.photos/id/63/5000/2813.jpg',
             'category' => $this->category,
-            'address' => 'Dhaka, Bangladesh',
+            'product_image' => 'https://fastly.picsum.photos/id/63/5000/2813.jpg',
+            'rating' =>[
+                    'average' => 4.5,
+                    'total' => 100
+            ],
+            'pricing' => [
+                'price' => $this->price,
+                'discounted_price' => $this->discounted_price,
+                'discount' => $this->discount,
+                'currency' => $this->currency,
+            ],
         ];
     }
 }
