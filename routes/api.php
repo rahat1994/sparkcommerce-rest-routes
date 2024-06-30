@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Rahat1994\SparkcommerceRestRoutes\Http\Controllers\AuthController;
+use Rahat1994\SparkcommerceRestRoutes\Http\Controllers\CartController;
 
 Route::group(['prefix' => 'sc/v1'], function () {
     Route::post('/login', [AuthController::class, 'login']);
@@ -16,6 +17,8 @@ Route::group(['prefix' => 'sc/v1'], function () {
         Route::post('/update-profile ', [AuthController::class, 'updateProfile']);
         Route::post('/logout', [AuthController::class, 'logout']);
     });
+
+    Route::post('/cart', [CartController::class, 'addToCart']);
 });
 // Route::post('/login', [AuthController::class, 'login']);
 // Route::post('/register', [AuthController::class, 'register']);
