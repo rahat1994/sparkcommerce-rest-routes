@@ -16,7 +16,10 @@ Route::group(['prefix' => 'sc/v1'], function () {
         Route::post('/update-password', [AuthController::class, 'updatePassword']);
         Route::post('/update-profile ', [AuthController::class, 'updateProfile']);
         Route::post('/logout', [AuthController::class, 'logout']);
+        Route::get('/cart', [CartController::class, 'getCart']);
         Route::post('/cart', [CartController::class, 'addToCart']);
+        Route::delete('/cart/clear_all', [CartController::class, 'clearUserCart']);
+        Route::delete('/cart/{slug}', [CartController::class, 'removeFromCart']);
     });
 });
 // Route::post('/login', [AuthController::class, 'login']);

@@ -13,6 +13,23 @@ use Illuminate\Support\Str;
 class CartController extends Controller
 {
 
+    public function getCart(Request $request)
+    {
+
+        $user = auth()->user();
+
+        $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
+
+        $cart = $this->loadCartWithAllItems($cart);
+
+        return response()->json(
+            [
+                'cart' => $cart
+            ],
+            200
+        );
+    }
+
     public function addToCart(Request $request)
     {
         $request->validate([
@@ -24,17 +41,23 @@ class CartController extends Controller
 
         $user = auth()->user();
 
-        // dd($user);
-
         $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
 
-        $cartItem = new CartItem([
-            'itemable_id' => $product->id,
-            'itemable_type' => SCProduct::class,
-            'quantity' => 2,
-        ]);
-        $cart->items()->save($cartItem);
+        // check if product already exists in the cart
+        $cartItem = $cart->items()->where('itemable_id', $product->id)->first();
 
+        // if product already exists in the cart, update the quantity
+        if ($cartItem) {
+            $cartItem->quantity = $request->quantity;
+            $cartItem->save();
+        } else {
+            $cartItem = new CartItem([
+                'itemable_id' => $product->id,
+                'itemable_type' => SCProduct::class,
+                'quantity' => $request->quantity,
+            ]);
+            $cart->items()->save($cartItem);
+        }
         $cart = $this->loadCartWithAllItems($cart);
         // dd($cart);
         return response()->json(
@@ -44,21 +67,59 @@ class CartController extends Controller
             ],
             200
         );
-        // dd($cart->calculatedPriceByQuantity());
+    }
+
+    public function removeFromCart(Request $request, $slug)
+    {
+        $product = SCProduct::where('slug', $slug)->firstOrFail();
+
+        $user = auth()->user();
+
+        $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
+
+        $cartItem = $cart->items()->where('itemable_id', $product->id)->get();
+        // dd();
+        $cart->removeItem($cartItem[0]);
+
+        $cart = $this->loadCartWithAllItems($cart);
+        return response()->json(
+            [
+                'message' => 'Product removed from cart successfully',
+                'cart' => $cart
+            ],
+            200
+        );
+    }
+
+    public function clearUserCart(Request $request)
+    {
+        $user = auth()->user();
+
+        $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
+
+        $cart->emptyCart();
+
+        return response()->json(
+            [
+                'message' => 'Cart cleared successfully',
+                'cart' => []
+            ],
+            200
+        );
     }
 
     private function loadCartWithAllItems(Cart $cart)
     {
         $cartItems = [];
         $cart = $cart->load('items.itemable');
-
+        // dd($cart);
         $cart->items()->each(function ($item) use (&$cartItems) {
-            $cartItems[] = SCProductResource::make($item->itemable);
-            // dd($cartItems);
-            // return $cartItems;
-        });
+            $temp = [];
+            $temp['quantity'] = $item->quantity;
+            $temp['item'] = SCProductResource::make($item->itemable);
 
-        // dd($cartItems, $cart->items);
+            $cartItems[] = $temp;
+        });
 
         return $cartItems;
     }
