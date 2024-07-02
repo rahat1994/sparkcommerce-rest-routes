@@ -16,11 +16,8 @@ Route::group(['prefix' => 'sc/v1'], function () {
         Route::post('/update-password', [AuthController::class, 'updatePassword']);
         Route::post('/update-profile ', [AuthController::class, 'updateProfile']);
         Route::post('/logout', [AuthController::class, 'logout']);
-
         Route::post('/cart', [CartController::class, 'addToCart']);
     });
-
-    
 });
 // Route::post('/login', [AuthController::class, 'login']);
 // Route::post('/register', [AuthController::class, 'register']);

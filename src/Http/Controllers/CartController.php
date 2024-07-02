@@ -19,9 +19,14 @@ class CartController extends Controller
             'slug' => 'required|string',
             'quantity' => 'required|integer|min:1',
         ]);
-        
+
         $product = SCProduct::where('slug', $request->slug)->firstOrFail();
-        $cart = Cart::query()->firstOrCreate(['user_id' => 5]);
+
+        $user = auth()->user();
+
+        // dd($user);
+
+        $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
 
         $cartItem = new CartItem([
             'itemable_id' => $product->id,
