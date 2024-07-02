@@ -19,16 +19,7 @@ class CartController extends Controller
             'slug' => 'required|string',
             'quantity' => 'required|integer|min:1',
         ]);
-
-        if (!auth()->check()) {
-            return response()->json(
-                [
-                    'message' => 'You need to be logged in to add products to cart',
-                ],
-                401
-            );
-        }
-
+        
         $product = SCProduct::where('slug', $request->slug)->firstOrFail();
         $cart = Cart::query()->firstOrCreate(['user_id' => 5]);
 
