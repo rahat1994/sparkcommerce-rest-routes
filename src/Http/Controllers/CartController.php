@@ -4,30 +4,54 @@ namespace Rahat1994\SparkcommerceRestRoutes\Http\Controllers;
 
 use Binafy\LaravelCart\Models\Cart;
 use Binafy\LaravelCart\Models\CartItem;
+use Exception;
+use Hashids\Hashids;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\DB;
 use Rahat1994\SparkCommerce\Models\SCProduct;
 use Rahat1994\SparkcommerceRestRoutes\Http\Resources\SCProductResource;
 use Illuminate\Support\Str;
+use Rahat1994\SparkCommerce\Models\SCAnonymousCart;
 
 class CartController extends Controller
 {
 
-    public function getCart(Request $request)
+    public function getCart(Request $request, $refernce = null)
     {
 
-        $user = auth()->user();
+        if (auth()->check()) {
+            $user = auth()->user();
+            $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
+            $cart = $this->loadCartWithAllItems($cart);
 
-        $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
-
-        $cart = $this->loadCartWithAllItems($cart);
-
-        return response()->json(
-            [
-                'cart' => $cart
-            ],
-            200
-        );
+            return response()->json(
+                [
+                    'cart' => $cart
+                ],
+                200
+            );
+        } else {
+            try {
+                $project = strval(config("app.name"));
+                $hashIds = new Hashids($project);
+                $anonymousCartId = $hashIds->decode($refernce);
+                // dd($anonymousCartId);
+                if (empty($anonymousCartId)) {
+                    throw new Exception('Cart not found');
+                }
+                $cart = SCAnonymousCart::findOrFail($anonymousCartId[0]);
+            } catch (\Throwable $th) {
+                // dd($th);
+                return response()->json(
+                    [
+                        'message' => 'Cart not found',
+                        'cart' => []
+                    ],
+                    404
+                );
+            }
+        }
     }
 
     public function addToCart(Request $request)
@@ -122,5 +146,52 @@ class CartController extends Controller
         });
 
         return $cartItems;
+    }
+
+    public function checkout(Request $request)
+    {
+        // Assuming you have a Cart model and it's already filled with items
+        $cart = Cart::where('id', $cartId)->where('user_id', $userId)->first();
+
+        if (!$cart || $cart->items->isEmpty()) {
+            throw new Exception("Cart is empty or not found.");
+        }
+
+        // Begin database transaction to ensure data integrity
+        DB::beginTransaction();
+        try {
+            // Create a new Order
+            $order = new Order();
+            $order->user_id = $userId;
+            $order->status = 'pending';
+            // Add other order details like shipping address, etc.
+            $order->save();
+
+            // Loop through cart items and add them to the order
+            foreach ($cart->items as $cartItem) {
+                $orderItem = new OrderItem();
+                $orderItem->order_id = $order->id;
+                $orderItem->product_id = $cartItem->product_id;
+                $orderItem->quantity = $cartItem->quantity;
+                // Add other item details like price, etc.
+                $orderItem->save();
+
+                // Optionally, update inventory here
+            }
+
+            // Process payment and update order status if successful
+
+            // Mark cart as processed or delete it
+            $cart->delete(); // or mark as processed
+
+            DB::commit();
+
+            // Send order confirmation to user
+
+            return $order;
+        } catch (Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
     }
 }
