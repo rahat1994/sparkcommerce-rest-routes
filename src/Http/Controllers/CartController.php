@@ -13,6 +13,7 @@ use Rahat1994\SparkCommerce\Models\SCProduct;
 use Rahat1994\SparkcommerceRestRoutes\Http\Resources\SCProductResource;
 use Illuminate\Support\Str;
 use Rahat1994\SparkCommerce\Models\SCAnonymousCart;
+use Rahat1994\SparkCommerce\Models\SCOrder;
 
 class CartController extends Controller
 {
@@ -252,9 +253,12 @@ class CartController extends Controller
         // dd($cart);
 
         foreach ($cart as $item) {
+
+            $product = SCProduct::where('slug', $item['slug'])->firstOrFail();
+
             $temp = [];
             $temp['quantity'] = $item['quantity'];
-            $temp['item'] = SCProduct::where('slug', $item['slug'])->first();
+            $temp['item'] = SCProductResource::make($product);
 
             $cartItems[] = $temp;
         }
@@ -281,8 +285,9 @@ class CartController extends Controller
 
     public function checkout(Request $request)
     {
+        $user = auth()->user();
         // Assuming you have a Cart model and it's already filled with items
-        $cart = Cart::where('id', $cartId)->where('user_id', $userId)->first();
+        $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
 
         if (!$cart || $cart->items->isEmpty()) {
             throw new Exception("Cart is empty or not found.");
@@ -292,8 +297,8 @@ class CartController extends Controller
         DB::beginTransaction();
         try {
             // Create a new Order
-            $order = new Order();
-            $order->user_id = $userId;
+            $order = new SCOrder();
+            $order->user_id = $user->id;
             $order->status = 'pending';
             // Add other order details like shipping address, etc.
             $order->save();
