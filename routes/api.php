@@ -4,6 +4,8 @@ use Illuminate\Support\Facades\Route;
 use Rahat1994\SparkcommerceRestRoutes\Http\Controllers\AuthController;
 use Rahat1994\SparkcommerceRestRoutes\Http\Controllers\CartController;
 
+use function Pest\Laravel\post;
+
 Route::group(['prefix' => 'sc/v1'], function () {
     Route::post('/login', [AuthController::class, 'login']);
     Route::post('/register', [AuthController::class, 'register']);
@@ -22,7 +24,8 @@ Route::group(['prefix' => 'sc/v1'], function () {
     });
 
     Route::get('/cart/{reference?}', [CartController::class, 'getCart']);
-    Route::post('/cart', [CartController::class, 'addToCart']);
+    Route::post('/cart/{reference?}', [CartController::class, 'addToCart']);
+    Route::post('/associate_anonymous_cart/{reference?}', [CartController::class, 'associateAnonymousCart']);
     Route::delete('/cart/clear_all', [CartController::class, 'clearUserCart']);
     Route::delete('/cart/{slug}', [CartController::class, 'removeFromCart']);
 });

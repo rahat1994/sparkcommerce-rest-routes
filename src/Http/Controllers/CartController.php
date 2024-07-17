@@ -17,6 +17,8 @@ use Rahat1994\SparkCommerce\Models\SCAnonymousCart;
 class CartController extends Controller
 {
 
+
+
     public function getCart(Request $request, $refernce = null)
     {
 
@@ -54,43 +56,100 @@ class CartController extends Controller
         }
     }
 
-    public function addToCart(Request $request)
+    public function addToCart(Request $request, $refernce = null)
     {
         $request->validate([
             'slug' => 'required|string',
             'quantity' => 'required|integer|min:1',
         ]);
 
-        $product = SCProduct::where('slug', $request->slug)->firstOrFail();
+        if (auth()->check()) {
+            $product = SCProduct::where('slug', $request->slug)->firstOrFail();
 
-        $user = auth()->user();
+            $user = auth()->user();
 
-        $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
+            $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
 
-        // check if product already exists in the cart
-        $cartItem = $cart->items()->where('itemable_id', $product->id)->first();
+            // check if product already exists in the cart
+            $cartItem = $cart->items()->where('itemable_id', $product->id)->first();
 
-        // if product already exists in the cart, update the quantity
-        if ($cartItem) {
-            $cartItem->quantity = $request->quantity;
-            $cartItem->save();
+            // if product already exists in the cart, update the quantity
+            if ($cartItem) {
+                $cartItem->quantity = $request->quantity;
+                $cartItem->save();
+            } else {
+                $cartItem = new CartItem([
+                    'itemable_id' => $product->id,
+                    'itemable_type' => SCProduct::class,
+                    'quantity' => $request->quantity,
+                ]);
+                $cart->items()->save($cartItem);
+            }
+            $cart = $this->loadCartWithAllItems($cart);
+            // dd($cart);
+            return response()->json(
+                [
+                    'message' => 'Product added to cart successfully',
+                    'cart' => $cart
+                ],
+                200
+            );
         } else {
-            $cartItem = new CartItem([
-                'itemable_id' => $product->id,
-                'itemable_type' => SCProduct::class,
-                'quantity' => $request->quantity,
-            ]);
-            $cart->items()->save($cartItem);
+            $project = strval(config("app.name"));
+            $hashIds = new Hashids($project);
+
+            if (is_null($refernce)) {
+
+                $cart = new SCAnonymousCart();
+                $cart->cart_content = [];
+                $cart->save();
+                $refernce = $hashIds->encode($cart->id);
+            }
+            $anonymousCartId = $hashIds->decode($refernce);
+            // dd($anonymousCartId);
+            if (empty($anonymousCartId)) {
+                throw new Exception('Cart not found');
+            }
+            $anonymosCart = SCAnonymousCart::findOrFail($anonymousCartId[0]);
+
+            $product = SCProduct::where('slug', $request->slug)->firstOrFail();
+
+            // check if product already exists in the cart
+            $cartItems = $anonymosCart->cart_content;
+
+            // update the quantity if product already exists in the cart in json
+
+            $productIndex = -1;
+
+            foreach ($cartItems as $key => $item) {
+                if ($item['slug'] == $product->slug) {
+                    $productIndex = $key;
+                    break;
+                }
+            }
+
+            if ($productIndex != -1) {
+                $cartItems[$productIndex]['quantity'] = $request->quantity;
+            } else {
+                $cartItems[] = [
+                    'slug' => $product->slug,
+                    'quantity' => $request->quantity
+                ];
+            }
+
+            $anonymosCart->cart_content = $cartItems;
+            $anonymosCart->save();
+            $cart = $this->loadAnonymousCartWithAllItems($anonymosCart);
+
+            return response()->json(
+                [
+                    'message' => 'Product added to cart successfully',
+                    'refernce' => $refernce,
+                    'cart' => $cart
+                ],
+                200
+            );
         }
-        $cart = $this->loadCartWithAllItems($cart);
-        // dd($cart);
-        return response()->json(
-            [
-                'message' => 'Product added to cart successfully',
-                'cart' => $cart
-            ],
-            200
-        );
     }
 
     public function removeFromCart(Request $request, $slug)
@@ -131,6 +190,78 @@ class CartController extends Controller
             200
         );
     }
+
+    public function associateAnonymousCart(Request $request, $refernce = null)
+    {
+        // this controller method will be used to associate the anonymous cart with the user cart
+
+        $project = strval(config("app.name"));
+        $hashIds = new Hashids($project);
+
+        $anonymousCartId = $hashIds->decode($refernce);
+
+        if (empty($anonymousCartId)) {
+            throw new Exception('Cart not found');
+        }
+
+        $anonymosCart = SCAnonymousCart::findOrFail($anonymousCartId[0]);
+
+        $user = auth()->user();
+
+        $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
+
+        $cartItems = $anonymosCart->cart_content;
+
+        foreach ($cartItems as $item) {
+            $product = SCProduct::where('slug', $item['slug'])->firstOrFail();
+
+            // check if product already exists in the cart
+            $cartItem = $cart->items()->where('itemable_id', $product->id)->first();
+
+            // if product already exists in the cart, update the quantity
+            if ($cartItem) {
+                $cartItem->quantity = $item['quantity'];
+                $cartItem->save();
+            } else {
+                $cartItem = new CartItem([
+                    'itemable_id' => $product->id,
+                    'itemable_type' => SCProduct::class,
+                    'quantity' => $item['quantity'],
+                ]);
+                $cart->items()->save($cartItem);
+            }
+        }
+
+        $anonymosCart->delete();
+
+        $cart = $this->loadCartWithAllItems($cart);
+
+        return response()->json(
+            [
+                'message' => 'Cart associated successfully',
+                'cart' => $cart
+            ],
+            200
+        );
+    }
+
+    private function loadAnonymousCartWithAllItems(SCAnonymousCart $cart)
+    {
+        $cartItems = [];
+        $cart = $cart->cart_content;
+        // dd($cart);
+
+        foreach ($cart as $item) {
+            $temp = [];
+            $temp['quantity'] = $item['quantity'];
+            $temp['item'] = SCProduct::where('slug', $item['slug'])->first();
+
+            $cartItems[] = $temp;
+        }
+
+        return $cartItems;
+    }
+
 
     private function loadCartWithAllItems(Cart $cart)
     {
