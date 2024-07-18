@@ -68,7 +68,7 @@ class CartController extends Controller
             try {
                 $product = SCProduct::where('slug', $request->slug)->firstOrFail();
             } catch (\Throwable $th) {
-
+                dd($th);
                 return response()->json(
                     [
                         'message' => 'Product not found',
@@ -125,7 +125,17 @@ class CartController extends Controller
             }
             $anonymosCart = SCAnonymousCart::findOrFail($anonymousCartId[0]);
 
-            $product = SCProduct::where('slug', $request->slug)->firstOrFail();
+            try {
+                $product = SCProduct::where('slug', $request->slug)->firstOrFail();
+            } catch (\Throwable $th) {
+                return response()->json(
+                    [
+                        'message' => 'Product not found',
+                        'cart' => []
+                    ],
+                    404
+                );
+            }
 
             // check if product already exists in the cart
             $cartItems = $anonymosCart->cart_content;
