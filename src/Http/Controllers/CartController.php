@@ -65,7 +65,19 @@ class CartController extends Controller
         ]);
 
         if (auth()->check()) {
-            $product = SCProduct::where('slug', $request->slug)->firstOrFail();
+            try {
+                $product = SCProduct::where('slug', $request->slug)->firstOrFail();
+            } catch (\Throwable $th) {
+
+                return response()->json(
+                    [
+                        'message' => 'Product not found',
+                        'cart' => []
+                    ],
+                    404
+                );
+            }
+
 
             $user = auth()->user();
 
