@@ -307,6 +307,23 @@ class CartController extends Controller
 
     public function checkout(Request $request)
     {
+        $request->validate([
+            "items" => "required",
+            "shipping_address" => "required",
+            "billing_address" => "required",
+            "shipping_method" => "required",
+            "total_amount" => "required",
+            'tracking_number' => "required",
+            'transaction_id' => "required",
+            "discount" => "required",
+            "user_id" => "required",
+            "order_number" => "required",
+            "status" => "required",
+            "payment_status" => "required",
+            "shipping_status" => "required",
+            "payment_method" => "required"
+        ]);
+
         $user = auth()->user();
         // Assuming you have a Cart model and it's already filled with items
         $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
@@ -322,20 +339,23 @@ class CartController extends Controller
             $order = new SCOrder();
             $order->user_id = $user->id;
             $order->status = 'pending';
+            $order->items = $cart->items;
+
+            $order->shipping_address = $request->shipping_address;
+            $order->billing_address = $request->billing_address;
+            $order->shipping_method = $request->shipping_method;
+            $order->total_amount = $request->total_amount;
+            $order->tracking_number = $request->tracking_number;
+            $order->transaction_id = $request->transaction_id;
+            $order->discount = $request->discount;
+            $order->user_id = $request->user_id;
+            $order->order_number = $request->order_number;
+            $order->status = $request->status;
+            $order->payment_status = $request->payment_status;
+            $order->shipping_status = $request->shipping_status;
+            $order->payment_method = $request->payment_method;
             // Add other order details like shipping address, etc.
             $order->save();
-
-            // Loop through cart items and add them to the order
-            foreach ($cart->items as $cartItem) {
-                $orderItem = new OrderItem();
-                $orderItem->order_id = $order->id;
-                $orderItem->product_id = $cartItem->product_id;
-                $orderItem->quantity = $cartItem->quantity;
-                // Add other item details like price, etc.
-                $orderItem->save();
-
-                // Optionally, update inventory here
-            }
 
             // Process payment and update order status if successful
 
