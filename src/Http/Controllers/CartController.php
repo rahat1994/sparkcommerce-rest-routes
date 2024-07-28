@@ -213,26 +213,109 @@ class CartController extends Controller
         return false;
     }
 
-    public function removeFromCart(Request $request, $slug)
+    public function removeFromCart(Request $request, $slug, $refernce = null)
     {
         $product = SCProduct::where('slug', $slug)->firstOrFail();
 
         $user = $this->user();
 
-        $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
+        if ($user !== null) {
+            $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
 
-        $cartItem = $cart->items()->where('itemable_id', $product->id)->get();
-        // dd();
-        $cart->removeItem($cartItem[0]);
+            $cartItem = $cart->items()->where('itemable_id', $product->id)->get();
+            // dd();
+            $cart->removeItem($cartItem[0]);
 
-        $cart = $this->loadCartWithAllItems($cart);
-        return response()->json(
-            [
-                'message' => 'Product removed from cart successfully',
-                'cart' => $cart
-            ],
-            200
-        );
+            $cart = $this->loadCartWithAllItems($cart);
+            return response()->json(
+                [
+                    'message' => 'Product removed from cart successfully',
+                    'cart' => $cart
+                ],
+                200
+            );
+        } else {
+
+            try {
+                $project = strval(config("app.name"));
+                $hashIds = new Hashids($project);
+                $anonymousCartId = $hashIds->decode($refernce);
+                // dd($anonymousCartId);
+                if (empty($anonymousCartId)) {
+                    throw new Exception('Cart not found');
+                }
+                $anonymosCart = SCAnonymousCart::findOrFail($anonymousCartId[0]);
+
+                try {
+                    $product = SCProduct::where('slug', $request->slug)->firstOrFail();
+                } catch (\Throwable $th) {
+                    return response()->json(
+                        [
+                            'message' => 'Product not found',
+                            'cart' => []
+                        ],
+                        404
+                    );
+                }
+
+                // check if product already exists in the cart
+                $cartItems = $anonymosCart->cart_content;
+
+                // update the quantity if product already exists in the cart in json
+
+                $productIndex = -1;
+
+                foreach ($cartItems as $key => $item) {
+                    if ($item['slug'] == $product->slug) {
+                        $productIndex = $key;
+                        break;
+                    }
+                }
+
+                if ($productIndex != -1) {
+                    unset($cartItems[$productIndex]);
+                } else {
+                    return response()->json(
+                        [
+                            'message' => 'Product not found in cart',
+                            'refernce' => $refernce
+                        ],
+                        200
+                    );
+                }
+
+                $anonymosCart->cart_content = $cartItems;
+                $anonymosCart->save();
+                $cart = $this->loadAnonymousCartWithAllItems($anonymosCart);
+
+                return response()->json(
+                    [
+                        'message' => 'Product removed from cart successfully',
+                        'refernce' => $refernce,
+                        'cart' => $cart
+                    ],
+                    200
+                );
+            } catch (\Throwable $th) {
+
+                return response()->json(
+                    [
+                        'message' => 'Cart not found',
+                        'cart' => []
+                    ],
+                    404
+                );
+            }
+        }
+    }
+
+    public function decodeAnonymousCartReferenceId($refernce)
+    {
+        $project = strval(config("app.name"));
+        $hashIds = new Hashids($project);
+        $anonymousCartId = $hashIds->decode($refernce);
+
+        return $anonymousCartId;
     }
 
     public function clearUserCart(Request $request)

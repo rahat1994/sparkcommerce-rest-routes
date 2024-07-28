@@ -30,7 +30,7 @@ Route::group(['prefix' => 'sc/v1'], function () {
     Route::post('/cart/{reference?}', [CartController::class, 'addToCart']);
     Route::post('/associate_anonymous_cart/{reference?}', [CartController::class, 'associateAnonymousCart']);
     Route::delete('/cart/clear_all', [CartController::class, 'clearUserCart']);
-    Route::delete('/cart/{slug}', [CartController::class, 'removeFromCart']);
+    Route::delete('/cart/{slug}/{reference?}', [CartController::class, 'removeFromCart']);
 });
 // Route::post('/login', [AuthController::class, 'login']);
 // Route::post('/register', [AuthController::class, 'register']);
