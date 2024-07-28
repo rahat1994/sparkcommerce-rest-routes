@@ -49,6 +49,17 @@ class CartController extends Controller
                     throw new Exception('Cart not found');
                 }
                 $cart = SCAnonymousCart::findOrFail($anonymousCartId[0]);
+
+                $cart = $this->loadAnonymousCartWithAllItems($cart);
+
+                return response()->json(
+                    [
+                        'message' => 'Product added to cart successfully',
+                        'refernce' => $refernce,
+                        'cart' => $cart
+                    ],
+                    200
+                );
             } catch (\Throwable $th) {
                 // dd($th);
                 return response()->json(
@@ -67,7 +78,10 @@ class CartController extends Controller
         $request->validate([
             'slug' => 'required|string',
             'quantity' => 'required|integer|min:1',
+            'replace_existing' => 'boolean'
         ]);
+
+        $replaceExisting = is_null($request->replace_existing) ? false : true;
 
         $user = $this->user();
         if ($user !== null) {
@@ -93,6 +107,16 @@ class CartController extends Controller
                 $cartItem->quantity = $request->quantity;
                 $cartItem->save();
             } else {
+
+                if ($this->productHasDifferentVendor($product, $cart)) {
+                    return response()->json(
+                        [
+                            'message' => 'You can not add products from different vendors in the same cart',
+                            'cart' => $this->loadCartWithAllItems($cart)
+                        ],
+                        400
+                    );
+                }
 
                 $cartItem = new CartItem([
                     'itemable_id' => $product->id,
@@ -176,6 +200,17 @@ class CartController extends Controller
                 200
             );
         }
+    }
+
+    public function productHasDifferentVendor($product, $cart)
+    {
+        $cartItems = $cart->items()->get();
+        foreach ($cartItems as $item) {
+            if ($item->itemable->vendor_id != $product->vendor_id) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public function removeFromCart(Request $request, $slug)
@@ -376,7 +411,7 @@ class CartController extends Controller
             $order->shipping_address = json_encode($request->shipping_address);
             $order->billing_address = json_encode($request->billing_address);
             $order->shipping_method = json_encode($request->shipping_method);
-            $order->total_amount = $request->total_amount;
+            $order->total_amount = $total_amount;
 
             $order->tracking_number = Str::random(10);
 

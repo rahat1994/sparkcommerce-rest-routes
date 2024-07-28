@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Rahat1994\SparkcommerceRestRoutes\Http\Controllers\AuthController;
 use Rahat1994\SparkcommerceRestRoutes\Http\Controllers\CartController;
+use Rahat1994\SparkcommerceRestRoutes\Http\Controllers\ProductController;
 
 use function Pest\Laravel\post;
 
@@ -22,6 +23,8 @@ Route::group(['prefix' => 'sc/v1'], function () {
 
         Route::post('/checkout', [CartController::class, 'checkout']);
     });
+
+    Route::get('/product/{slug}', [ProductController::class, 'show']);
 
     Route::get('/cart/{reference?}', [CartController::class, 'getCart']);
     Route::post('/cart/{reference?}', [CartController::class, 'addToCart']);
