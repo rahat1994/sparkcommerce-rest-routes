@@ -6,8 +6,10 @@ use Binafy\LaravelCart\Models\Cart;
 use Binafy\LaravelCart\Models\CartItem;
 use Exception;
 use Hashids\Hashids;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Rahat1994\SparkCommerce\Models\SCProduct;
 use Rahat1994\SparkcommerceRestRoutes\Http\Resources\SCProductResource;
@@ -18,13 +20,16 @@ use Rahat1994\SparkCommerce\Models\SCOrder;
 class CartController extends Controller
 {
 
-
+    protected function user()
+    {
+        return Auth::guard('sanctum')->user();
+    }
 
     public function getCart(Request $request, $refernce = null)
     {
+        $user = $this->user();
+        if ($user !== null) {
 
-        if (auth()->check()) {
-            $user = auth()->user();
             $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
             $cart = $this->loadCartWithAllItems($cart);
 
@@ -64,11 +69,11 @@ class CartController extends Controller
             'quantity' => 'required|integer|min:1',
         ]);
 
-        if (auth()->check()) {
+        $user = $this->user();
+        if ($user !== null) {
             try {
                 $product = SCProduct::where('slug', $request->slug)->firstOrFail();
             } catch (\Throwable $th) {
-                dd($th);
                 return response()->json(
                     [
                         'message' => 'Product not found',
@@ -77,9 +82,6 @@ class CartController extends Controller
                     404
                 );
             }
-
-
-            $user = auth()->user();
 
             $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
 
@@ -91,6 +93,7 @@ class CartController extends Controller
                 $cartItem->quantity = $request->quantity;
                 $cartItem->save();
             } else {
+
                 $cartItem = new CartItem([
                     'itemable_id' => $product->id,
                     'itemable_type' => SCProduct::class,
@@ -179,7 +182,7 @@ class CartController extends Controller
     {
         $product = SCProduct::where('slug', $slug)->firstOrFail();
 
-        $user = auth()->user();
+        $user = $this->user();
 
         $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
 
@@ -199,7 +202,7 @@ class CartController extends Controller
 
     public function clearUserCart(Request $request)
     {
-        $user = auth()->user();
+        $user = $this->user();
 
         $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
 
@@ -229,7 +232,7 @@ class CartController extends Controller
 
         $anonymosCart = SCAnonymousCart::findOrFail($anonymousCartId[0]);
 
-        $user = auth()->user();
+        $user = $this->user();
 
         $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
 
@@ -305,28 +308,57 @@ class CartController extends Controller
         return $cartItems;
     }
 
+    protected function validateCoupons()
+    {
+        // validate coupons
+        return true;
+    }
+
     public function checkout(Request $request)
     {
+        // dd($request->all());
         $request->validate([
-            "items" => "required",
+            "items" => "required|array",
             "shipping_address" => "required",
             "billing_address" => "required",
             "shipping_method" => "required",
             "total_amount" => "required",
-            'tracking_number' => "required",
-            'transaction_id' => "required",
-            "discount" => "required",
-            "user_id" => "required",
-            "order_number" => "required",
-            "status" => "required",
-            "payment_status" => "required",
-            "shipping_status" => "required",
-            "payment_method" => "required"
+            "discount" => "sometimes",
+            "payment_method" => "required",
+            "transaction_id" => "required",
         ]);
 
-        $user = auth()->user();
+        $user = $this->user();
         // Assuming you have a Cart model and it's already filled with items
         $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
+        $items = $request->items;
+
+        $total_amount = 0;
+        $vendor_id = null;
+
+        foreach ($items as $key => $item) {
+            try {
+                $product = SCProduct::where('slug', $item['slug'])->firstOrFail();
+            } catch (ModelNotFoundException $e) {
+                return response()->json(
+                    [
+                        'message' => 'Product not found',
+                        'cart' => []
+                    ],
+                    404
+                );
+            } catch (\Throwable $th) {
+                return response()->json(
+                    [
+                        'message' => $th->getMessage(),
+                        'cart' => []
+                    ],
+                    404
+                );
+            }
+            $vendor_id = $product->vendor_id;
+            $total_amount += ($product->getPrice() * $item['quantity']);
+        }
 
         if (!$cart || $cart->items->isEmpty()) {
             throw new Exception("Cart is empty or not found.");
@@ -341,19 +373,22 @@ class CartController extends Controller
             $order->status = 'pending';
             $order->items = $cart->items;
 
-            $order->shipping_address = $request->shipping_address;
-            $order->billing_address = $request->billing_address;
-            $order->shipping_method = $request->shipping_method;
+            $order->shipping_address = json_encode($request->shipping_address);
+            $order->billing_address = json_encode($request->billing_address);
+            $order->shipping_method = json_encode($request->shipping_method);
             $order->total_amount = $request->total_amount;
-            $order->tracking_number = $request->tracking_number;
-            $order->transaction_id = $request->transaction_id;
+
+            $order->tracking_number = Str::random(10);
+
             $order->discount = $request->discount;
-            $order->user_id = $request->user_id;
-            $order->order_number = $request->order_number;
-            $order->status = $request->status;
-            $order->payment_status = $request->payment_status;
-            $order->shipping_status = $request->shipping_status;
-            $order->payment_method = $request->payment_method;
+            $order->user_id = $user->id;
+            $order->vendor_id = $vendor_id;
+            // $order->order_number = $request->order_number;
+
+            // $order->transaction_id = $request->transaction_id;
+            // $order->payment_status = $request->payment_status;
+            // $order->shipping_status = 'pending';
+            // $order->payment_method = $request->payment_method;
             // Add other order details like shipping address, etc.
             $order->save();
 
