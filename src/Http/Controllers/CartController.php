@@ -335,14 +335,16 @@ class CartController extends Controller
         );
     }
 
-    public function associateAnonymousCart(Request $request, $refernce = null)
+    public function associateAnonymousCart(Request $request)
     {
+
+        $request->validate([
+            'reference' => 'required|string',
+        ]);
         // this controller method will be used to associate the anonymous cart with the user cart
 
-        $project = strval(config("app.name"));
-        $hashIds = new Hashids($project);
-
-        $anonymousCartId = $hashIds->decode($refernce);
+        $refernce = $request->reference;
+        $anonymousCartId = $this->decodeAnonymousCartReferenceId($refernce);
 
         if (empty($anonymousCartId)) {
             throw new Exception('Cart not found');

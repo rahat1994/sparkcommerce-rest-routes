@@ -20,7 +20,7 @@ Route::group(['prefix' => 'sc/v1'], function () {
         Route::post('/update-profile ', [AuthController::class, 'updateProfile']);
         Route::post('/logout', [AuthController::class, 'logout']);
 
-
+        Route::post('/associate_anonymous_cart', [CartController::class, 'associateAnonymousCart']);
         Route::post('/checkout', [CartController::class, 'checkout']);
     });
 
@@ -28,7 +28,7 @@ Route::group(['prefix' => 'sc/v1'], function () {
 
     Route::get('/cart/{reference?}', [CartController::class, 'getCart']);
     Route::post('/cart/{reference?}', [CartController::class, 'addToCart']);
-    Route::post('/associate_anonymous_cart/{reference?}', [CartController::class, 'associateAnonymousCart']);
+
     Route::delete('/cart/clear_all', [CartController::class, 'clearUserCart']);
     Route::delete('/cart/{slug}/{reference?}', [CartController::class, 'removeFromCart']);
 });
