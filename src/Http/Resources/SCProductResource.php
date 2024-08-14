@@ -8,7 +8,6 @@ class SCProductResource extends JsonResource
 {
     public function toArray($request)
     {
-        dd($this);
         return [
             'name' => $this->name,
             'slug' => $this->slug,
