@@ -12,7 +12,7 @@ use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Rahat1994\SparkCommerce\Models\SCProduct;
-use Rahat1994\SparkcommerceRestRoutes\Http\Resources\SCProductResource;
+use Rahat1994\SparkcommerceMultivendorRestRoutes\Http\Resources\SCMVProductResource;
 use Illuminate\Support\Str;
 use Rahat1994\SparkCommerce\Models\SCAnonymousCart;
 use Rahat1994\SparkCommerce\Models\SCOrder;
@@ -403,7 +403,7 @@ class CartController extends Controller
 
             $temp = [];
             $temp['quantity'] = $item['quantity'];
-            $temp['item'] = SCProductResource::make($product);
+            $temp['item'] = SCMVProductResource::make($product);
 
             $cartItems[] = $temp;
         }
@@ -420,7 +420,7 @@ class CartController extends Controller
         $cart->items()->each(function ($item) use (&$cartItems) {
             $temp = [];
             $temp['quantity'] = $item->quantity;
-            $temp['item'] = SCProductResource::make($item->itemable);
+            $temp['item'] = SCMVProductResource::make($item->itemable);
 
             $cartItems[] = $temp;
         });
