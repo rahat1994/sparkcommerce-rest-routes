@@ -16,6 +16,7 @@ use Rahat1994\SparkcommerceMultivendorRestRoutes\Http\Resources\SCMVProductResou
 use Illuminate\Support\Str;
 use Rahat1994\SparkCommerce\Models\SCAnonymousCart;
 use Rahat1994\SparkCommerce\Models\SCOrder;
+use Rahat1994\SparkcommerceRestRoutes\Http\Resources\SCOrderResource;
 
 class CartController extends Controller
 {
@@ -520,8 +521,9 @@ class CartController extends Controller
             DB::commit();
 
             // Send order confirmation to user
+            return SCOrderResource::make($order);
 
-            return $order;
+            
         } catch (Exception $e) {
             DB::rollBack();
             throw $e;
