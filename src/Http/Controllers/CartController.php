@@ -6,16 +6,21 @@ use Binafy\LaravelCart\Models\Cart;
 use Binafy\LaravelCart\Models\CartItem;
 use Exception;
 use Hashids\Hashids;
+use Illuminate\Container\Attributes\Log;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log as FacadesLog;
 use Rahat1994\SparkCommerce\Models\SCProduct;
 use Rahat1994\SparkcommerceMultivendorRestRoutes\Http\Resources\SCMVProductResource;
 use Illuminate\Support\Str;
+use Pest\Plugins\Verbose;
 use Rahat1994\SparkCommerce\Models\SCAnonymousCart;
+use Rahat1994\SparkCommerce\Models\SCCoupon;
 use Rahat1994\SparkCommerce\Models\SCOrder;
+use Rahat1994\SparkcommerceMultivendor\Models\SCMVVendor;
 use Rahat1994\SparkcommerceRestRoutes\Http\Resources\SCOrderResource;
 
 class CartController extends Controller
@@ -26,51 +31,59 @@ class CartController extends Controller
         return Auth::guard('sanctum')->user();
     }
 
-    public function getCart(Request $request, $refernce = null)
+    public function getUsersCart(int $userId)
+    {
+        $cart = Cart::query()->firstOrCreate(['user_id' => $userId]);
+        return $this->loadCartWithAllItems($cart);
+    }
+
+    public function getAnonymousCart($refernce)
+    {
+        $project = strval(config("app.name"));
+        $hashIds = new Hashids($project);
+        $anonymousCartId = $hashIds->decode($refernce);
+        // dd($anonymousCartId);
+        if (empty($anonymousCartId)) {
+            throw new Exception('Cart not found');
+        }
+        $cart = SCAnonymousCart::findOrFail($anonymousCartId[0]);
+
+        return $this->loadAnonymousCartWithAllItems($cart);
+    }
+
+    public function getCartAccordingToLoginType($refernce)
     {
         $user = $this->user();
         if ($user !== null) {
-
-            $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
-            $cart = $this->loadCartWithAllItems($cart);
-
-            return response()->json(
-                [
-                    'cart' => $cart
-                ],
-                200
-            );
+            return $this->getUsersCart($user->id);
         } else {
             try {
-                $project = strval(config("app.name"));
-                $hashIds = new Hashids($project);
-                $anonymousCartId = $hashIds->decode($refernce);
-                // dd($anonymousCartId);
-                if (empty($anonymousCartId)) {
-                    throw new Exception('Cart not found');
-                }
-                $cart = SCAnonymousCart::findOrFail($anonymousCartId[0]);
-
-                $cart = $this->loadAnonymousCartWithAllItems($cart);
-
-                return response()->json(
-                    [
-                        'message' => 'Product added to cart successfully',
-                        'refernce' => $refernce,
-                        'cart' => $cart
-                    ],
-                    200
-                );
+                return $this->getAnonymousCart($refernce);
             } catch (\Throwable $th) {
-                // dd($th);
                 return response()->json(
                     [
-                        'message' => 'Cart not found',
+                        'message' => 'Error retrieving cart',
                         'cart' => []
                     ],
-                    404
+                    500
                 );
             }
+        }
+    }
+
+    public function getCart(Request $request, $refernce = null)
+    {
+        try {
+            $cart = $this->getCartAccordingToLoginType($refernce);
+            return response()->json(['cart' => $cart], 200);
+        } catch (\Throwable $th) {
+            return response()->json(
+                [
+                    'message' => 'Error retrieving cart',
+                    'cart' => []
+                ],
+                500
+            );
         }
     }
 
@@ -429,10 +442,95 @@ class CartController extends Controller
         return $cartItems;
     }
 
-    protected function validateCoupons()
+    public function validateCoupon(Request $request)
     {
+        $request->validate([
+            'coupon_code' => 'required|string',
+            'reference' => 'string|sometimes'
+        ]);
+        $couponData = $this->couponData($request->coupon_code);
+
+        if ($couponData) {
+
+            $cart = $this->getCartAccordingToLoginType($request->refernce);
+
+            // now process the cart and apply the coupon
+
+
+
+            return response()->json(
+                [
+                    'message' => 'Coupon applied successfully',
+                    'cart' => []
+                ],
+                200
+            );
+        } else {
+            return response()->json(
+                [
+                    'message' => 'Invalid coupon code',
+                    'cart' => []
+                ],
+                400
+            );
+        }
+    }
+
+    protected function couponData(string $couponCode)
+    {
+        try {
+            $coupon = SCCoupon::where('coupon_code', $couponCode)
+                ->firstOrFail();
+        } catch (\Throwable $th) {
+            FacadesLog::error($th->getMessage());
+            return false;
+        }
+
         // validate coupons
-        return true;
+        return false;
+    }
+
+    protected function applyCoupon($cart, $coupon)
+    {
+        // apply coupon to cart
+        $couponType = $coupon->coupon_type;
+
+        // check the end date & start date of the coupon
+        $couponEndDate = $coupon->end_date;
+        $couponStartDate = $coupon->start_date;
+
+        if ($couponEndDate < now() || $couponStartDate > now()) {
+            throw new Exception('Coupon is not valid');
+        }
+        // check the minimum amount of the coupon
+        $cartTotalAmount = $cart->total_amount;
+        $couponMinimumAmount = $coupon->minimum_amount;
+
+        if ($cartTotalAmount < $couponMinimumAmount) {
+            throw new Exception('Cart total amount is less than the minimum amount required for the coupon');
+        }
+
+        // check the maximum amount of the coupon
+        $couponMaximumAmount = $coupon->maximum_amount;
+
+        if ($cartTotalAmount > $couponMaximumAmount) {
+            throw new Exception('Cart total amount is greater than the maximum amount required for the coupon');
+        }
+
+        // check the usage limit of the coupon
+        $couponUsageLimit = $coupon->usage_limit;
+
+
+
+
+        // check the usage limit per user of the coupon
+
+        // check the coupon type
+        if ($couponType == 'fixed') {
+            $cart->total_amount = $cart->total_amount - $coupon->coupon_amount;
+        } else {
+            $cart->total_amount = $cart->total_amount - ($cart->total_amount * $coupon->coupon_amount / 100);
+        }
     }
 
     public function checkout(Request $request)
