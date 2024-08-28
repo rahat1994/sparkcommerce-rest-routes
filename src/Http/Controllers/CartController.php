@@ -14,13 +14,14 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log as FacadesLog;
 use Rahat1994\SparkCommerce\Models\SCProduct;
-use Rahat1994\SparkcommerceRestRoutes\Http\Resources\SCProductResource;
+use Rahat1994\SparkcommerceMultivendorRestRoutes\Http\Resources\SCMVProductResource;
 use Illuminate\Support\Str;
 use Pest\Plugins\Verbose;
 use Rahat1994\SparkCommerce\Models\SCAnonymousCart;
 use Rahat1994\SparkCommerce\Models\SCCoupon;
 use Rahat1994\SparkCommerce\Models\SCOrder;
 use Rahat1994\SparkcommerceMultivendor\Models\SCMVVendor;
+use Rahat1994\SparkcommerceRestRoutes\Http\Resources\SCOrderResource;
 
 class CartController extends Controller
 {
@@ -416,7 +417,7 @@ class CartController extends Controller
 
             $temp = [];
             $temp['quantity'] = $item['quantity'];
-            $temp['item'] = SCProductResource::make($product);
+            $temp['item'] = SCMVProductResource::make($product);
 
             $cartItems[] = $temp;
         }
@@ -433,7 +434,7 @@ class CartController extends Controller
         $cart->items()->each(function ($item) use (&$cartItems) {
             $temp = [];
             $temp['quantity'] = $item->quantity;
-            $temp['item'] = SCProductResource::make($item->itemable);
+            $temp['item'] = SCMVProductResource::make($item->itemable);
 
             $cartItems[] = $temp;
         });
@@ -618,8 +619,9 @@ class CartController extends Controller
             DB::commit();
 
             // Send order confirmation to user
+            return SCOrderResource::make($order);
 
-            return $order;
+            
         } catch (Exception $e) {
             DB::rollBack();
             throw $e;
