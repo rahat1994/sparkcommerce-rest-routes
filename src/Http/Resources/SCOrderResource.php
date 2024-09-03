@@ -18,7 +18,9 @@ class SCOrderResource extends JsonResource
             'billing_address' => $this->billing_address,
             'shipping_method' => $this->shipping_method,
             'total_amount' => $this->total_amount,
-            'tracking_number' => $this->tracking_number
+            'tracking_number' => $this->tracking_number,
+            'payment_method' => $this->payment_method,
+            'created_at' => $this->created_at,
         ];
     }
 
@@ -26,15 +28,15 @@ class SCOrderResource extends JsonResource
     {
         $products = [];
         $itemQuantity = [];
-        // dd($items);   
+        // dd($items);
         foreach ($items as $item) {
-            if($item['itemable_type'] === 'Rahat1994\SparkCommerce\Models\SCProduct'){
+            if ($item['itemable_type'] === 'Rahat1994\SparkCommerce\Models\SCProduct') {
                 $products[] = $item['itemable_id'];
                 $itemQuantity[$item['itemable_id']] = $item['quantity'];
-            }            
+            }
         }
         // dd($products);
-        $serializedItems = [];        
+        $serializedItems = [];
         $products = SCProduct::whereIn('id', array_values($products))->get();
 
         $products->map(function ($product) use ($itemQuantity, &$serializedItems) {
@@ -43,8 +45,7 @@ class SCOrderResource extends JsonResource
                 'item' => SCMVProductResource::make($product),
             ];
         });
-        
+
         return $serializedItems;
-        
     }
 }
