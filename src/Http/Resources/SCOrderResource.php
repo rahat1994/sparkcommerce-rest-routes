@@ -20,7 +20,8 @@ class SCOrderResource extends JsonResource
             'total_amount' => $this->total_amount,
             'tracking_number' => $this->tracking_number,
             'payment_method' => $this->payment_method,
-            'created_at' => $this->created_at,
+            'transaction_id' => $this->transaction_id,
+            'created_at' => $this->created_at
         ];
     }
 
