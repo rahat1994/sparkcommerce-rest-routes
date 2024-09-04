@@ -22,8 +22,9 @@ class SCProductResource extends JsonResource
                 'total' => 100
             ],
             'pricing' => [
-                'price' => $this->price,
-                'discounted_price' => $this->discounted_price,
+                'price' => $this->regular_price,
+
+                'discounted_price' => $this->sale_price,
                 'discount' => $this->discount,
                 'currency' => $this->currency,
             ],
