@@ -21,6 +21,7 @@ class SCProductResource extends JsonResource
                 'average' => 4.5,
                 'total' => 100
             ],
+            'sku' => $this->sku,
             'pricing' => [
                 'price' => $this->regular_price,
 
