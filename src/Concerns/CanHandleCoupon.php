@@ -9,38 +9,6 @@ use Rahat1994\SparkCommerce\Models\SCCoupon;
 
 trait CanHandleCoupon
 {
-    public function validateCoupon(Request $request)
-    {
-        $request->validate([
-            'coupon_code' => 'required|string',
-            'reference' => 'string|sometimes',
-        ]);
-        $couponData = $this->couponData($request->coupon_code);
-
-        if ($couponData) {
-
-            $cart = $this->getCartAccordingToLoginType($request->refernce);
-
-            // now process the cart and apply the coupon
-
-            return response()->json(
-                [
-                    'message' => 'Coupon applied successfully',
-                    'cart' => [],
-                ],
-                200
-            );
-        } else {
-            return response()->json(
-                [
-                    'message' => 'Invalid coupon code',
-                    'cart' => [],
-                ],
-                400
-            );
-        }
-    }
-
     protected function couponData(string $couponCode)
     {
         try {

@@ -17,161 +17,83 @@ trait CanHandleCart
     public function getCartWithItemObjects(int $userId)
     {
         $cart = Cart::query()->firstOrCreate(['user_id' => $userId]);
-        return $this->loadCartWithAllItems($cart);
+
+        $cart = $this->mutateDataBeforeLoadingCartWithAllItems($cart);
+
+        $cartData = $this->loadCartWithAllItems($cart);
+
+        return $cartData;
     }
 
     public function addItemToCart(Request $request)
     {
         $user = $this->user();
         try {
+
             $product = SCProduct::where('slug', $request->slug)->firstOrFail();
-        } catch (\Throwable $th) {
+            $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
+            $cartItem = $cart->items()->where('itemable_id', $product->id)->first();    
+
+            if ($cartItem) {
+                $this->beginDatabaseTransaction();
+
+                $quantity = $this->mutateQuantityBeforeUpdatingCartItem($cartItem, $request);
+
+                $cartItem->quantity = $quantity;
+                $cartItem->save();
+                
+                $this->commitDatabaseTransaction();
+
+                $this->callHook('afterUpdatingCartItem');
+            } else {
+
+                $this->beginDatabaseTransaction();
+
+                $data = $this->beforeAddingItemToCart($cart, $product, $request);
+    
+                $cartItem = new CartItem($data);
+
+                $cart->items()->save($cartItem);
+
+                $this->callHook('afterAddingItemToCart');
+
+                $this->commitDatabaseTransaction();
+            }
+            $cart = $this->loadCartWithAllItems($cart);   
+            
             return response()->json(
                 [
-                    'message' => 'Product not found',
-                    'cart' => [],
+                    'message' => 'Product added to cart successfully',
+                    'cart' => $cart,
                 ],
-                404
+                200
             );
-        }
-
-        $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
-
-        // check if product already exists in the cart
-        $cartItem = $cart->items()->where('itemable_id', $product->id)->first();
-
-        // if product already exists in the cart, update the quantity
-        if ($cartItem) {
-            $cartItem->quantity = $request->quantity;
-            $cartItem->save();
-        } else {
-
-            if ($this->productHasDifferentVendor($product, $cart)) {
-                return response()->json(
-                    [
-                        'message' => 'You can not add products from different vendors in the same cart',
-                        'cart' => $this->loadCartWithAllItems($cart),
-                    ],
-                    400
-                );
-            }
-
-            $cartItem = new CartItem([
-                'itemable_id' => $product->id,
-                'itemable_type' => SCProduct::class,
-                'quantity' => $request->quantity,
-            ]);
-            $cart->items()->save($cartItem);
-        }
-        $cart = $this->loadCartWithAllItems($cart);
-
-        
-        return response()->json(
-            [
-                'message' => 'Product added to cart successfully',
-                'cart' => $cart,
-            ],
-            200
-        );
-        
+        } 
+        catch (\Throwable $exception) {
+            throw $exception;
+        }        
     }
 
-    public function removeFromCart(Request $request, $slug, $refernce = null)
+    public function removeItemFromCart(Request $request, $slug, $refernce = null)
     {
         $product = SCProduct::where('slug', $slug)->firstOrFail();
 
         $user = $this->user();
 
-        if ($user !== null) {
-            $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
+        $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
+        $cartItem = $cart->items()->where('itemable_id', $product->id)->get();
+        $cart->removeItem($cartItem[0]);
 
-            $cartItem = $cart->items()->where('itemable_id', $product->id)->get();
-            // dd();
-            $cart->removeItem($cartItem[0]);
+        $cart = $this->loadCartWithAllItems($cart);
 
-            $cart = $this->loadCartWithAllItems($cart);
-
-            return response()->json(
-                [
-                    'message' => 'Product removed from cart successfully',
-                    'cart' => $cart,
-                ],
-                200
-            );
-        } else {
-
-            try {
-                $project = strval(config('app.name'));
-                $hashIds = new Hashids($project);
-                $anonymousCartId = $hashIds->decode($refernce);
-                // dd($anonymousCartId);
-                if (empty($anonymousCartId)) {
-                    throw new Exception('Cart not found');
-                }
-                $anonymosCart = SCAnonymousCart::findOrFail($anonymousCartId[0]);
-
-                try {
-                    $product = SCProduct::where('slug', $request->slug)->firstOrFail();
-                } catch (\Throwable $th) {
-                    return response()->json(
-                        [
-                            'message' => 'Product not found',
-                            'cart' => [],
-                        ],
-                        404
-                    );
-                }
-
-                // check if product already exists in the cart
-                $cartItems = $anonymosCart->cart_content;
-
-                // update the quantity if product already exists in the cart in json
-
-                $productIndex = -1;
-
-                foreach ($cartItems as $key => $item) {
-                    if ($item['slug'] == $product->slug) {
-                        $productIndex = $key;
-
-                        break;
-                    }
-                }
-
-                if ($productIndex != -1) {
-                    unset($cartItems[$productIndex]);
-                } else {
-                    return response()->json(
-                        [
-                            'message' => 'Product not found in cart',
-                            'refernce' => $refernce,
-                        ],
-                        200
-                    );
-                }
-
-                $anonymosCart->cart_content = $cartItems;
-                $anonymosCart->save();
-                $cart = $this->loadAnonymousCartWithAllItems($anonymosCart);
-
-                return response()->json(
-                    [
-                        'message' => 'Product removed from cart successfully',
-                        'refernce' => $refernce,
-                        'cart' => $cart,
-                    ],
-                    200
-                );
-            } catch (\Throwable $th) {
-
-                return response()->json(
-                    [
-                        'message' => 'Cart not found',
-                        'cart' => [],
-                    ],
-                    404
-                );
-            }
-        }
+        return response()->json(
+            [
+                'message' => 'Product removed from cart successfully',
+                'cart' => $cart,
+            ],
+            200
+        );
+        
     }
 
     public function clearUserCart(Request $request)
@@ -193,6 +115,8 @@ trait CanHandleCart
     
     private function loadCartWithAllItems(Cart $cart)
     {
+        $this->callHook('beforeLoadingCartWithAllItems');
+
         $cartItems = [];
         $cart = $cart->load('items.itemable');
         // dd($cart);
@@ -204,6 +128,32 @@ trait CanHandleCart
             $cartItems[] = $temp;
         });
 
+        $this->callHook('afterLoadingCartWithAllItems');
+
         return $cartItems;
+        
+    }
+
+    public function mutateDataBeoforeLoadingAllItems($cart){
+        return $cart;
+    }
+
+    public function mutateDataBeforeLoadingCartWithAllItems($cart)
+    {
+        return $cart;
+    }
+
+    protected function mutateQuantityBeforeUpdatingCartItem($cartItem, $request)
+    {
+        return $request->quantity;
+    }
+
+    protected function beforeAddingItemToCart($cart, $product, $request)
+    {
+        return [
+            'itemable_id' => $product->id,
+            'itemable_type' => SCProduct::class,
+            'quantity' => $request->quantity,
+        ];
     }
 }
