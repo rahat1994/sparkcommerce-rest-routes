@@ -6,35 +6,32 @@ use Binafy\LaravelCart\Models\Cart;
 use Binafy\LaravelCart\Models\CartItem;
 use Exception;
 use Hashids\Hashids;
-use Illuminate\Container\Attributes\Log;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log as FacadesLog;
 use Rahat1994\SparkCommerce\Models\SCProduct;
 use Rahat1994\SparkcommerceMultivendorRestRoutes\Http\Resources\SCMVProductResource;
 use Illuminate\Support\Str;
-use Pest\Plugins\Verbose;
 use Rahat1994\SparkCommerce\Models\SCAnonymousCart;
 use Rahat1994\SparkCommerce\Models\SCCoupon;
 use Rahat1994\SparkCommerce\Models\SCOrder;
-use Rahat1994\SparkcommerceMultivendor\Models\SCMVVendor;
+use Rahat1994\SparkcommerceRestRoutes\Concerns\CanHandleAnonymousCart;
+use Rahat1994\SparkcommerceRestRoutes\Concerns\CanHandleCart;
+use Rahat1994\SparkcommerceRestRoutes\Concerns\CanRetriveUser;
 use Rahat1994\SparkcommerceRestRoutes\Http\Resources\SCOrderResource;
 
 class CartController extends Controller
 {
-
-    protected function user()
-    {
-        return Auth::guard('sanctum')->user();
-    }
+    use CanRetriveUser;
+    use CanHandleCart;
+    use CanHandleAnonymousCart;
 
     public function getUsersCart(int $userId)
     {
-        $cart = Cart::query()->firstOrCreate(['user_id' => $userId]);
-        return $this->loadCartWithAllItems($cart);
+        return $this->getCartWithItemObjects($userId);
     }
 
     public function getAnonymousCart($refernce)
@@ -54,29 +51,31 @@ class CartController extends Controller
     public function getCartAccordingToLoginType($refernce)
     {
         $user = $this->user();
-        if ($user !== null) {
+        if (null !== $user) {
             return $this->getUsersCart($user->id);
-        } else {
-            try {
-                return $this->getAnonymousCart($refernce);
-            } catch (\Throwable $th) {
-                return response()->json(
-                    [
-                        'message' => 'Error retrieving cart',
-                        'cart' => []
-                    ],
-                    500
-                );
-            }
         }
+        
+        try {
+            return $this->getAnonymousCart($refernce);
+        } catch (\Throwable $th) {
+            return response()->json(
+                [
+                    'message' => 'Error retrieving cart',
+                    'cart' => []
+                ],
+                500
+            );
+        }
+    
     }
 
-    public function getCart(Request $request, $refernce = null)
+    public function getCart(Request $request, $refernce = null) : JsonResponse
     {
+        dd("Hello");
         try {
             $cart = $this->getCartAccordingToLoginType($refernce);
             return response()->json(['cart' => $cart], 200);
-        } catch (\Throwable $th) {
+        } catch (Exception $e) {
             return response()->json(
                 [
                     'message' => 'Error retrieving cart',
@@ -95,125 +94,15 @@ class CartController extends Controller
             'replace_existing' => 'boolean'
         ]);
 
-        $replaceExisting = is_null($request->replace_existing) ? false : true;
+        $replaceExisting = is_null($request->replace_existing) ? false : $request->replace_existing;
 
         $user = $this->user();
+        
         if ($user !== null) {
-            try {
-                $product = SCProduct::where('slug', $request->slug)->firstOrFail();
-            } catch (\Throwable $th) {
-                return response()->json(
-                    [
-                        'message' => 'Product not found',
-                        'cart' => []
-                    ],
-                    404
-                );
-            }
+            return $this->addItemToCart($request);
+        } 
 
-            $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
-
-            // check if product already exists in the cart
-            $cartItem = $cart->items()->where('itemable_id', $product->id)->first();
-
-            // if product already exists in the cart, update the quantity
-            if ($cartItem) {
-                $cartItem->quantity = $request->quantity;
-                $cartItem->save();
-            } else {
-
-                if ($this->productHasDifferentVendor($product, $cart)) {
-                    return response()->json(
-                        [
-                            'message' => 'You can not add products from different vendors in the same cart',
-                            'cart' => $this->loadCartWithAllItems($cart)
-                        ],
-                        400
-                    );
-                }
-
-                $cartItem = new CartItem([
-                    'itemable_id' => $product->id,
-                    'itemable_type' => SCProduct::class,
-                    'quantity' => $request->quantity,
-                ]);
-                $cart->items()->save($cartItem);
-            }
-            $cart = $this->loadCartWithAllItems($cart);
-            // dd($cart);
-            return response()->json(
-                [
-                    'message' => 'Product added to cart successfully',
-                    'cart' => $cart
-                ],
-                200
-            );
-        } else {
-            $project = strval(config("app.name"));
-            $hashIds = new Hashids($project);
-
-            if (is_null($refernce)) {
-
-                $cart = new SCAnonymousCart();
-                $cart->cart_content = [];
-                $cart->save();
-                $refernce = $hashIds->encode($cart->id);
-            }
-            $anonymousCartId = $hashIds->decode($refernce);
-            // dd($anonymousCartId);
-            if (empty($anonymousCartId)) {
-                throw new Exception('Cart not found');
-            }
-            $anonymosCart = SCAnonymousCart::findOrFail($anonymousCartId[0]);
-
-            try {
-                $product = SCProduct::where('slug', $request->slug)->firstOrFail();
-            } catch (\Throwable $th) {
-                return response()->json(
-                    [
-                        'message' => 'Product not found',
-                        'cart' => []
-                    ],
-                    404
-                );
-            }
-
-            // check if product already exists in the cart
-            $cartItems = $anonymosCart->cart_content;
-
-            // update the quantity if product already exists in the cart in json
-
-            $productIndex = -1;
-
-            foreach ($cartItems as $key => $item) {
-                if ($item['slug'] == $product->slug) {
-                    $productIndex = $key;
-                    break;
-                }
-            }
-
-            if ($productIndex != -1) {
-                $cartItems[$productIndex]['quantity'] = $request->quantity;
-            } else {
-                $cartItems[] = [
-                    'slug' => $product->slug,
-                    'quantity' => $request->quantity
-                ];
-            }
-
-            $anonymosCart->cart_content = $cartItems;
-            $anonymosCart->save();
-            $cart = $this->loadAnonymousCartWithAllItems($anonymosCart);
-
-            return response()->json(
-                [
-                    'message' => 'Product added to cart successfully',
-                    'refernce' => $refernce,
-                    'cart' => $cart
-                ],
-                200
-            );
-        }
+        return $this->addItemToAnonymousCart($request, $refernce);
     }
 
     public function productHasDifferentVendor($product, $cart)
