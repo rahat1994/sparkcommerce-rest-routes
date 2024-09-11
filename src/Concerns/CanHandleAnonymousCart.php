@@ -2,183 +2,209 @@
 
 namespace Rahat1994\SparkcommerceRestRoutes\Concerns;
 
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Binafy\LaravelCart\Models\Cart;
 use Binafy\LaravelCart\Models\CartItem;
 use Exception;
 use Hashids\Hashids;
 use Illuminate\Http\Request;
-use Illuminate\Routing\Controller;
 use Rahat1994\SparkCommerce\Models\SCAnonymousCart;
 use Rahat1994\SparkCommerce\Models\SCProduct;
 use Rahat1994\SparkcommerceMultivendorRestRoutes\Http\Resources\SCMVProductResource;
 
 trait CanHandleAnonymousCart
 {
-    public function getAnonymousCart($refernce)
+    protected function GetHashIdObject()
     {
         $project = strval(config('app.name'));
-        $hashIds = new Hashids($project);
-        $anonymousCartId = $hashIds->decode($refernce);
+        return new Hashids($project);
+    }
+    public function getAnonymousCart($reference)
+    {
+        
+        $hashIdObj = $this->GetHashIdObject();
+        $anonymousCartId = $hashIdObj->decode($reference);
         if (empty($anonymousCartId)) {
             throw new Exception('Cart not found');
         }
-        $cart = SCAnonymousCart::findOrFail($anonymousCartId[0]);
+        $cart = $this->getAnonymousCartObj($anonymousCartId);
 
         return $this->loadAnonymousCartWithAllItems($cart);
     }
 
+    public function getAnonymousCartObj($anonymousCartId)
+    {
+        if (empty($anonymousCartId) || !isset($anonymousCartId[0])) {
+            throw new \InvalidArgumentException('Invalid anonymous cart ID.');
+        }
 
+        try {
+            return SCAnonymousCart::findOrFail($anonymousCartId[0]);
+        } catch (ModelNotFoundException $e) {
+            throw $e;
+        }
+    }
 
-    public function addItemToAnonymousCart(Request $request, $refernce = null){
-        $project = strval(config('app.name'));
-        $hashIds = new Hashids($project);
-
-        if (is_null($refernce)) {
-
+    public function addItemToAnonymousCart(Request $request, $reference = null){
+        
+        $hashIdObj = $this->GetHashIdObject();
+        
+        // If no reference is provided, create a new anonymous cart
+        if (is_null($reference)) {
             $cart = new SCAnonymousCart;
             $cart->cart_content = [];
             $cart->save();
-            $refernce = $hashIds->encode($cart->id);
+            
+            // Encode the cart ID to generate a reference
+            $reference = $hashIdObj->encode($cart->id);
         }
-        $anonymousCartId = $hashIds->decode($refernce);
+
+        // Decode the reference to get the anonymous cart ID
+        $anonymousCartId = $hashIdObj->decode($reference);
+
         // dd($anonymousCartId);
         if (empty($anonymousCartId)) {
             throw new Exception('Cart not found');
         }
-        $anonymosCart = SCAnonymousCart::findOrFail($anonymousCartId[0]);
+        $anonymousCart = $this->getAnonymousCartObj($anonymousCartId);
 
         try {
-            $product = SCProduct::where('slug', $request->slug)->firstOrFail();
-        } catch (\Throwable $th) {
-            return response()->json(
-                [
-                    'message' => 'Product not found',
-                    'cart' => [],
-                ],
-                404
-            );
-        }
-
-        // check if product already exists in the cart
-        $cartItems = $anonymosCart->cart_content;
-
-        // update the quantity if product already exists in the cart in json
-
-        $productIndex = -1;
-
-        foreach ($cartItems as $key => $item) {
-            if ($item['slug'] == $product->slug) {
-                $productIndex = $key;
-
-                break;
-            }
-        }
-
-        if ($productIndex != -1) {
-            $cartItems[$productIndex]['quantity'] = $request->quantity;
-        } else {
-            $cartItems[] = [
-                'slug' => $product->slug,
-                'quantity' => $request->quantity,
-            ];
-        }
-
-        $anonymosCart->cart_content = $cartItems;
-        $anonymosCart->save();
-        $cart = $this->loadAnonymousCartWithAllItems($anonymosCart);
-
-        return response()->json(
-            [
-                'message' => 'Product added to cart successfully',
-                'refernce' => $refernce,
-                'cart' => $cart,
-            ],
-            200
-        );
-    }
-    public function removeItemFromAnonymousCart(Request $request, $product, $refernce = null){
-
-        try {
-            $project = strval(config('app.name'));
-            $hashIds = new Hashids($project);
-            $anonymousCartId = $hashIds->decode($refernce);
-            // dd($anonymousCartId);
-            if (empty($anonymousCartId)) {
-                throw new Exception('Cart not found');
-            }
-            $anonymosCart = SCAnonymousCart::findOrFail($anonymousCartId[0]);
-
-            try {
-                $product = SCProduct::where('slug', $request->slug)->firstOrFail();
-            } catch (\Throwable $th) {
-                return response()->json(
-                    [
-                        'message' => 'Product not found',
-                        'cart' => [],
-                    ],
-                    404
-                );
-            }
-
-            // check if product already exists in the cart
-            $cartItems = $anonymosCart->cart_content;
+            $record = $this->getRecordBySlug($request->slug);
+            $cartItems = $anonymousCart->cart_content;
 
             // update the quantity if product already exists in the cart in json
 
             $productIndex = -1;
-
             foreach ($cartItems as $key => $item) {
-                if ($item['slug'] == $product->slug) {
+                if ($item['slug'] === $record->slug && 
+                    $item['itemable_type'] === $this->recordModel) {
                     $productIndex = $key;
-
                     break;
                 }
             }
+            $this->callHook('beforeModifyingAnonymousCart');
+            $this->beginDatabaseTransaction();
 
-            if ($productIndex != -1) {
-                unset($cartItems[$productIndex]);
+            $quantity = $this->mutateQuantityBeforeUpdatingAnonymousCartItem($record, $request);
+
+            if ($productIndex != -1) {                
+                $cartItems[$productIndex]['quantity'] = $quantity;
             } else {
-                return response()->json(
-                    [
-                        'message' => 'Product not found in cart',
-                        'refernce' => $refernce,
-                    ],
-                    200
-                );
+                $cartItems[] = [
+                    'itemable_type' => $this->recordModel,
+                    'slug' => $record->slug,
+                    'quantity' => $quantity,
+                ];
             }
 
-            $anonymosCart->cart_content = $cartItems;
-            $anonymosCart->save();
-            $cart = $this->loadAnonymousCartWithAllItems($anonymosCart);
+            $anonymousCart->cart_content = $cartItems;
+            $anonymousCart->reference = $reference;
+            $anonymousCart->save();
 
+            $this->commitDatabaseTransaction();
+            $cart = $this->loadAnonymousCartWithAllItems($anonymousCart);
+            $this->callHook('afterModifyingAnonymousCart');
             return response()->json(
                 [
-                    'message' => 'Product removed from cart successfully',
-                    'refernce' => $refernce,
+                    // TODO:: change the message and apply localization
+                    'message' => 'Product added to cart successfully',
+                    'reference' => $reference,
                     'cart' => $cart,
                 ],
                 200
             );
-        } catch (\Throwable $th) {
+        } catch (ModelNotFoundException $e) {
+            return response()->json(
+                [
+                    // TODO:: change the message and apply localization
+                    'message' => 'resource not found',
+                ],
+                404
+            );
+        }        
+        catch (\Throwable $th) {
+            dd($th);
+            return response()->json(
+                [
+                    // TODO:: change the message and apply localization
+                    'message' => 'Something went wrong',
+                ],
+                400
+            );
+        }        
+    }
+    public function removeItemFromAnonymousCart(Request $request, $slug, $reference){
+
+        try {
+            $hashIdObj = $this->GetHashIdObject();
+            $anonymousCartId = $hashIdObj->decode($reference);
+
+            $anonymousCart = $this->getAnonymousCartObj($anonymousCartId);
+
+            $record = $this->getRecordBySlug($slug);           
+
+            // check if product already exists in the cart
+            $cartItems = $anonymousCart->cart_content;
+
+            // update the quantity if product already exists in the cart in json
+            $productIndex = -1;
+
+            foreach ($cartItems as $key => $item) {
+                if ($item['slug'] == $record->slug
+                    && $item['itemable_type'] == $this->recordModel) {
+                    $productIndex = $key;
+                    break;
+                }
+            }
+
+            $this->beginDatabaseTransaction();
+
+            $this->callHook('beforeModifyingAnonymousCart');
+            $cartItems = $this->removeItemFromAnonymousCartContent($cartItems, $productIndex);
+
+            $anonymousCart->cart_content = $cartItems;
+            $anonymousCart->save();
+
+            $this->callHook('afterModifyingAnonymousCart');
+            $this->commitDatabaseTransaction();
+
+            $cart = $this->loadAnonymousCartWithAllItems($anonymousCart);
 
             return response()->json(
                 [
-                    'message' => 'Cart not found',
-                    'cart' => [],
+                    // TODO: change the message and apply localization
+                    'message' => 'Product removed from cart successfully',
+                    'reference' => $reference,
+                    'cart' => $cart,
+                ],
+                200
+            );
+        } 
+        catch (ModelNotFoundException $e) {
+            return response()->json(
+                [   
+                    // TODO: change the message and apply localization
+                    'message' => 'resource not found',
+                ],
+                404
+            );
+        } 
+        catch (\Throwable $th) {
+
+            return response()->json(
+                [
+                    // TODO: change the message and apply localization
+                    'message' => 'Cart not found'
                 ],
                 404
             );
         }
     }
 
-
-
-    public function decodeAnonymousCartReferenceId($refernce)
+    public function decodeAnonymousCartReferenceId($reference)
     {
-        $project = strval(config('app.name'));
-        $hashIds = new Hashids($project);
-        $anonymousCartId = $hashIds->decode($refernce);
+        $hashIds = $this->GetHashIdObject();
+        $anonymousCartId = $hashIds->decode($reference);
 
         return $anonymousCartId;
     }
@@ -191,20 +217,20 @@ trait CanHandleAnonymousCart
         ]);
         // this controller method will be used to associate the anonymous cart with the user cart
 
-        $refernce = $request->reference;
-        $anonymousCartId = $this->decodeAnonymousCartReferenceId($refernce);
+        $reference = $request->reference;
+        $anonymousCartId = $this->decodeAnonymousCartReferenceId($reference);
 
         if (empty($anonymousCartId)) {
             throw new Exception('Cart not found');
         }
 
-        $anonymosCart = SCAnonymousCart::findOrFail($anonymousCartId[0]);
+        $anonymousCart = SCAnonymousCart::findOrFail($anonymousCartId[0]);
 
         $user = $this->user();
 
         $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
 
-        $cartItems = $anonymosCart->cart_content;
+        $cartItems = $anonymousCart->cart_content;
 
         foreach ($cartItems as $item) {
             $product = SCProduct::where('slug', $item['slug'])->firstOrFail();
@@ -226,7 +252,7 @@ trait CanHandleAnonymousCart
             }
         }
 
-        $anonymosCart->delete();
+        $anonymousCart->delete();
 
         $cart = $this->loadCartWithAllItems($cart);
 
@@ -238,23 +264,50 @@ trait CanHandleAnonymousCart
             200
         );
     }
-    private function loadAnonymousCartWithAllItems(SCAnonymousCart $cart)
+    private function loadAnonymousCartWithAllItems(SCAnonymousCart $cartContent)
     {
         $cartItems = [];
-        $cart = $cart->cart_content;
-        // dd($cart);
+        $cartContent = $cartContent->cart_content;
+        $slugsByType = [];
+        $recorsByType = [];
+        foreach ($cartContent as $item) {
+            $slugsByType[$item['itemable_type']][] = $item['slug'];
+        }
+        $recourceClassMapping = $this->getResourceClassMapping();
+        foreach ($slugsByType as $type => $slugs) {
 
-        foreach ($cart as $item) {
+            $records = $this->getRecordsByItemTypeAndSlugs($type, $slugs)->keyBy('slug');
+            foreach($cartContent as $item){
+                $cartableRecord = $records->get($item['slug']);
+                $resourceClass = $recourceClassMapping[$type] ?? null;
 
-            $product = SCProduct::where('slug', $item['slug'])->firstOrFail();
+                if($resourceClass === null){
+                    continue;
+                }
 
-            $temp = [];
-            $temp['quantity'] = $item['quantity'];
-            $temp['item'] = SCMVProductResource::make($product);
+                if($cartableRecord){
+                    $temp = [];
+                    $temp['quantity'] = $item['quantity'];
+                    $temp['item'] = $resourceClass::make($cartableRecord);
+                    $cartItems[] = $temp;
+                }
+            }
+        }
+        return $cartItems;
+    }
 
-            $cartItems[] = $temp;
+    protected function mutateQuantityBeforeUpdatingAnonymousCartItem($cartItem, $request)
+    {
+        return $request->quantity;
+    }
+
+    protected function removeItemFromAnonymousCartContent($cartItems, $productIndex)
+    {
+        if ($productIndex == -1) {
+            throw new Exception('Product not found in the cart');   
         }
 
-        return $cartItems;
+        unset($cartItems[$productIndex]);
+        return $cartItems;        
     }
 }

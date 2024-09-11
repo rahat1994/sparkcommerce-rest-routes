@@ -30,10 +30,20 @@ class CartController extends SCBaseController
     use CanHandleAnonymousCart;
     use CanHandleCoupon;
 
-    public function getCart(Request $request, $refernce = null) : JsonResponse
+    public $recordModel = SCProduct::class;
+    // public function __construct()
+    // {
+    //     self::$recordModel = SCProduct::class;
+    // }
+
+    public function getCart(Request $request, $reference = null) : JsonResponse
     {
+        $request->validate([
+            'reference' => 'nullable|string',
+        ]);
+
         try {
-            $cart = $this->getCartAccordingToLoginType($refernce);
+            $cart = $this->getCartAccordingToLoginType($reference);
             return response()->json(['cart' => $cart], 200);
         } catch (Exception $e) {
             return response()->json(
@@ -46,7 +56,7 @@ class CartController extends SCBaseController
         }
     }
 
-    public function getCartAccordingToLoginType($refernce)
+    public function getCartAccordingToLoginType($reference)
     {
         $user = $this->user();
         if (null !== $user) {
@@ -54,7 +64,7 @@ class CartController extends SCBaseController
         }
         
         try {
-            return $this->getAnonymousCart($refernce);
+            return $this->getAnonymousCart($reference);
         } catch (\Throwable $th) {
             return response()->json(
                 [
@@ -67,23 +77,8 @@ class CartController extends SCBaseController
     
     }
 
-    public function getAnonymousCart($refernce)
-    {
-        $project = strval(config("app.name"));
-        $hashIds = new Hashids($project);
-        $anonymousCartId = $hashIds->decode($refernce);
-        // dd($anonymousCartId);
-        if (empty($anonymousCartId)) {
-            throw new Exception('Cart not found');
-        }
-        $cart = SCAnonymousCart::findOrFail($anonymousCartId[0]);
 
-        return $this->loadAnonymousCartWithAllItems($cart);
-    }
-
-
-
-    public function addToCart(Request $request, $refernce = null)
+    public function addToCart(Request $request, $reference = null)
     {
         $request->validate([
             'slug' => 'required|string',
@@ -100,18 +95,30 @@ class CartController extends SCBaseController
                 return $this->addItemToCart($request);
             } 
     
-            return $this->addItemToAnonymousCart($request, $refernce);
+            return $this->addItemToAnonymousCart($request, $reference);
         } catch (VendorNotSameException $exception){
             return response()->json(
                 [
+                    // TODO: Add a better message and internatiolization.
                     'message' => $exception->getMessage(),
                 ],
                 400
             );
-        } catch (\Throwable $th) {
+        } catch(ModelNotFoundException $exception){
             return response()->json(
                 [
-                    'message' => $th->getMessage(),
+                    // TODO: Add a better message and internatiolization.
+                    "message" => "Unable to locate the resource you requested.",
+                ],
+                404
+            );
+
+        }        
+        catch (\Throwable $th) {
+            return response()->json(
+                [
+                    // TODO: Add a better message and internatiolization.
+                    'message' => "An error occurred while adding the item to the cart.",
                 ],
                 400
             );
@@ -120,21 +127,20 @@ class CartController extends SCBaseController
 
 
 
-    public function removeFromCart(Request $request, $slug, $refernce = null)
+    public function removeFromCart(Request $request, $slug, $reference)
     {
         $request->validate([
             'slug' => 'required|string',
+            'reference' => 'string',
         ]);
 
         try {
-            $product = SCProduct::where('slug', $slug)->firstOrFail();
-
             $user = $this->user();
 
             if ($user !== null) {
-                return $this->removeItemFromCart($request, $product);
+                return $this->removeItemFromCart($request, $slug);
             }             
-            return $this->removeItemFromAnonymousCart($request, $product, $refernce);
+            return $this->removeItemFromAnonymousCart($request, $slug, $reference);
         } catch (\Throwable $th) {
             return response()->json(
                 [
@@ -156,7 +162,7 @@ class CartController extends SCBaseController
 
         if ($couponData) {
 
-            $cart = $this->getCartAccordingToLoginType($request->refernce);
+            $cart = $this->getCartAccordingToLoginType($request->reference);
 
             // now process the cart and apply the coupon
 

@@ -23,8 +23,7 @@ class SparkcommerceRestRoutesServiceProvider extends PackageServiceProvider
             ->hasConfigFile()
             ->hasViews()
             ->hasRoute('api')
-            ->hasMigration('create_sparkcommerce-rest-routes_table')
-            ->hasCommand(SparkcommerceRestRoutesCommand::class);
+            ->hasMigration('create_sparkcommerce-rest-routes_table');
 
         $this->passwordResetLinkChangeForSpa();
     }
