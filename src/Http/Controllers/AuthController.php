@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password as PasswordRule;
-class AuthController extends Controller
+class AuthController extends SCBaseController
 {
     public function login(Request $request)
     {
@@ -19,9 +19,10 @@ class AuthController extends Controller
             'device_name' => 'required',
         ]);
 
+        $data = $this->callHook('beforeLoginAttempt');
 
-
-        if (Auth::attempt($request->only('email', 'password'))) {
+        $loginData = $data ?? $request->only('email', 'password');
+        if (Auth::attempt($loginData)) {
 
             $response = [
                 'user' => Auth::user(),
@@ -29,7 +30,7 @@ class AuthController extends Controller
             ];
             return response()->json($response, 200);
         }
-
+        $this->callHook('afterLogin', $request);
         return response()->json([
             'error' => 'Invalid Credentials'
         ], 401);            
@@ -50,19 +51,24 @@ class AuthController extends Controller
             ],
             'device_name' => 'required',
         ]);
-        // dd($request->all());
-        $user = User::create([
+        
+        $data = $this->callHook('beforeRegister', $request);
+
+        $registerData = $data ?? [
             'name' => $request->name,
             'email' => $request->email,
             'password' => bcrypt($request->password),
-        ]);
+        ];
+        $user = User::create($registerData);
 
-        $response = [
+        $data = $this->callHook('afterRegister', $request, $user);
+
+        $responseData = $data ?? [
             'user' => $user,
             'token' => $user->createToken($request->device_name)->plainTextToken
         ];
 
-        return response()->json($response, 200);
+        return response()->json($responseData, 200);
     }
 
     public function me(Request $request)
@@ -76,10 +82,11 @@ class AuthController extends Controller
             'email' => 'required|email',
         ]);
 
+        $this->callHook('beforeForgotPasswordEmailSend', $request);
         $status = Password::sendResetLink(
             $request->only('email')
         );
-
+        $this->callHook('afterForgotPasswordEmailSend', $request);
         return $status === Password::RESET_LINK_SENT
                     ? response()->json(['message' => __($status)], 200)
                     : response()->json(['message' => __($status)], 400);
@@ -93,6 +100,7 @@ class AuthController extends Controller
             'password' => 'required|confirmed|min:6',
         ]);
 
+        $this->callHook('beforePasswordReset', $request);
         $status = Password::reset(
             $request->only('email', 'password', 'password_confirmation', 'token'),
             function (User $user,string $password) {
@@ -101,7 +109,7 @@ class AuthController extends Controller
                 ])->save();
             }
         );
-
+        $this->callHook('afterPasswordReset', $request);
         return $status == Password::PASSWORD_RESET
                     ? response()->json(['message' => __($status)], 200)
                     : response()->json(['message' => __($status)], 400);
@@ -112,13 +120,13 @@ class AuthController extends Controller
         $request->validate([
             'password' => 'required',
         ]);
-
+        $this->callHook('beforePasswordConfirmation', $request);
         if (!Hash::check($request->password, $request->user()->password)) {
             return response()->json([
                 'message' => 'The provided password does not match our records.'
             ], 400);
         }
-
+        $this->callHook('afterPasswordConfirmation', $request);
         return response()->json([
             'message' => 'Password confirmed'
         ], 200);
@@ -148,10 +156,11 @@ class AuthController extends Controller
             'name' => 'required',
         ]);
 
+        $this->callHook('beforeProfileUpdate', $request);
         $user = $request->user();
         $user->name = $request->name;
         $user->save();
-
+        $this->callHook('afterProfileUpdate', $request, $user);
         return response()->json($user, 200);
     }
 
@@ -169,21 +178,23 @@ class AuthController extends Controller
             ],
         ]);
 
+        $this->callHook('beforePasswordUpdate', $request);
         if (!Hash::check($request->current_password, $request->user()->password)) {
             return response()->json([
                 'message' => 'The provided password does not match our records.'
             ], 400);
         }
-
+        
         $user = $request->user();
         $user->password = bcrypt($request->password);
         $user->save();
-
+        $this->callHook('afterPasswordUpdate', $request);
         return response()->json($user, 200);
     }
 
     public function logout(Request $request)
     {
+        $this->callHook('beforeLogout', $request);
         $request->user()->currentAccessToken()->delete();
         return response()->json([
             'message' => 'Logged out'
