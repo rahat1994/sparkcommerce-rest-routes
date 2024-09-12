@@ -20,20 +20,8 @@ Route::group(['prefix' => 'sc/v1'], function () {
         Route::post('/update-password', [AuthController::class, 'updatePassword']);
         Route::post('/update-profile ', [AuthController::class, 'updateProfile']);
         Route::post('/logout', [AuthController::class, 'logout']);
-
-        Route::post('/associate_anonymous_cart', [CartController::class, 'associateAnonymousCart']);
-        Route::post('/checkout', [CartController::class, 'checkout']);
     });
 
     Route::get('/products', [ProductController::class, 'index']);
     Route::get('/product/{slug}', [ProductController::class, 'show']);
-
-    Route::get('/cart/{reference?}', [CartController::class, 'getCart']);
-    Route::post('/cart/{reference?}', [CartController::class, 'addToCart']);
-
-    Route::delete('/cart/clear_all', [CartController::class, 'clearUserCart']);
-    Route::delete('/cart/{slug}/{reference}', [CartController::class, 'removeFromCart']);
-
-    Route::post('/validate-coupon', [CartController::class, 'validateCoupon']);
-    Route::get('/categories/{vendor_id}', [CategoryController::class, 'index']);
 });
