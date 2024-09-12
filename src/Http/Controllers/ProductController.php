@@ -10,6 +10,8 @@ use Rahat1994\SparkcommerceRestRoutes\Http\Resources\SCProductResource;
 
 class ProductController extends SCBaseController
 {
+    public $recordModel = SCProduct::class;
+
     public function index(Request $request)
     {
         $request->validate([
@@ -17,35 +19,44 @@ class ProductController extends SCBaseController
             'categories' => 'string',
         ]);
 
-        $categorySlugs = $request->get('categories') === null
-            ? []
-            : explode(',', $request->get('categories', ''));
+        try {
+            $categorySlugs = $request->get('categories') === null
+                ? []
+                : explode(',', $request->get('categories', ''));
 
-        if (empty($categorySlugs)) {
-            $products = SCProduct::with('categories')->paginate(10);
+            if (empty($categorySlugs)) {
+                $products = $this->recordModel::with('categories')->paginate(10);
+                return SCProductResource::collection($products);
+            }
+
+            $products = $this->recordModel::with('categories')
+                ->when($categorySlugs, function ($query) use ($categorySlugs) {
+                    return $query->whereHas('categories', function ($query) use ($categorySlugs) {
+                        $query->whereIn('slug', $categorySlugs);
+                    });
+                })
+                ->paginate(10);
+            $modifiedProducts = $this->callHook('afterFetchingProducts', $products);
+            $products = $modifiedProducts ?? $products;
+
             return SCProductResource::collection($products);
+        } catch (\Throwable $th) {
+            return response()->json(['message' => 'Something went wrong'], 500);
         }
-
-        $products = SCProduct::with('categories')
-            ->when($categorySlugs, function ($query) use ($categorySlugs) {
-                return $query->whereHas('categories', function ($query) use ($categorySlugs) {
-                    $query->whereIn('slug', $categorySlugs);
-                });
-            })
-            ->paginate(10);
-
-        // $products = SCProduct::with('categories')->paginate(10);
-
-        return SCProductResource::collection($products);
     }
 
     public function show($slug)
     {
-        $product = SCProduct::where('slug', $slug)->with('sCMVVendor', 'categories')->first();
-        if (!$product) {
-            return response()->json(['error' => 'Product not found'], 404);
-        }
+        try {
+            $product = $this->recordModel::where('slug', $slug)->with('sCMVVendor', 'categories')->firstOrFail();
 
-        return SCMVProductResource::make($product);
+            $modifiedProduct = $this->callHook('beforeShow', $product);
+            $product = $modifiedProduct ?? $product;
+
+            return SCMVProductResource::make($product);
+        } catch (\Throwable $th) {
+
+            return response()->json(['message' => 'Something went wrong'], 500);
+        }
     }
 }

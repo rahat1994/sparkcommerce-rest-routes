@@ -54,28 +54,37 @@ class AuthController extends SCBaseController
             'device_name' => 'required',
         ]);
 
-        $data = $this->callHook('beforeRegister', $request);
+        try {
+            $data = $this->callHook('beforeRegister', $request);
 
-        $registerData = $data ?? [
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => bcrypt($request->password),
-        ];
-        $user = User::create($registerData);
+            $registerData = $data ?? [
+                'name' => $request->name,
+                'email' => $request->email,
+                'password' => bcrypt($request->password),
+            ];
+            $user = User::create($registerData);
 
-        $data = $this->callHook('afterRegister', $request, $user);
+            $data = $this->callHook('afterRegister', $request, $user);
 
-        $responseData = $data ?? [
-            'user' => $user,
-            'token' => $user->createToken($request->device_name)->plainTextToken
-        ];
+            $responseData = $data ?? [
+                'user' => $user,
+                'token' => $user->createToken($request->device_name)->plainTextToken
+            ];
 
-        return response()->json($responseData, 200);
+            return response()->json($responseData, 200);
+        } catch (\Throwable $th) {
+            //throw $th;
+            return response()->json(['message' => 'Something went wrong'], 500);
+        }
     }
 
     public function me(Request $request)
     {
-        return response()->json($request->user(), 200);
+        try {
+            return response()->json($request->user(), 200);
+        } catch (\Throwable $th) {
+            return response()->json(['message' => 'Something went wrong'], 500);
+        }
     }
 
     public function forgotPassword(Request $request)
@@ -142,14 +151,6 @@ class AuthController extends SCBaseController
             'token' => 'required',
             'email' => 'required|email',
         ]);
-
-        // $status = Password::sendResetLink(
-        //     $request->only('email')
-        // );
-
-        // return $status === Password::RESET_LINK_SENT
-        //             ? response()->json(['message' => __($status)], 200)
-        //             : response()->json(['message' => __($status)], 400);
     }
 
     public function updateProfile(Request $request)
@@ -158,12 +159,16 @@ class AuthController extends SCBaseController
             'name' => 'required',
         ]);
 
-        $this->callHook('beforeProfileUpdate', $request);
-        $user = $request->user();
-        $user->name = $request->name;
-        $user->save();
-        $this->callHook('afterProfileUpdate', $request, $user);
-        return response()->json($user, 200);
+        try {
+            $this->callHook('beforeProfileUpdate', $request);
+            $user = $request->user();
+            $user->name = $request->name;
+            $user->save();
+            $this->callHook('afterProfileUpdate', $request, $user);
+            return response()->json($user, 200);
+        } catch (\Throwable $th) {
+            return response()->json(['message' => 'Something went wrong'], 500);
+        }
     }
 
     public function updatePassword(Request $request)
@@ -180,26 +185,34 @@ class AuthController extends SCBaseController
             ],
         ]);
 
-        $this->callHook('beforePasswordUpdate', $request);
-        if (!Hash::check($request->current_password, $request->user()->password)) {
-            return response()->json([
-                'message' => 'The provided password does not match our records.'
-            ], 400);
-        }
+        try {
+            $this->callHook('beforePasswordUpdate', $request);
+            if (!Hash::check($request->current_password, $request->user()->password)) {
+                return response()->json([
+                    'message' => 'The provided password does not match our records.'
+                ], 400);
+            }
 
-        $user = $request->user();
-        $user->password = bcrypt($request->password);
-        $user->save();
-        $this->callHook('afterPasswordUpdate', $request);
-        return response()->json($user, 200);
+            $user = $request->user();
+            $user->password = bcrypt($request->password);
+            $user->save();
+            $this->callHook('afterPasswordUpdate', $request);
+            return response()->json($user, 200);
+        } catch (\Throwable $th) {
+            return response()->json(['message' => 'Something went wrong'], 500);
+        }
     }
 
     public function logout(Request $request)
     {
         $this->callHook('beforeLogout', $request);
-        $request->user()->currentAccessToken()->delete();
-        return response()->json([
-            'message' => 'Logged out'
-        ], 200);
+        try {
+            $request->user()->currentAccessToken()->delete();
+            return response()->json([
+                'message' => 'Logged out'
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json(['message' => 'Something went wrong'], 500);
+        }
     }
 }

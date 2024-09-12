@@ -11,8 +11,14 @@ class CategoryController extends SCBaseController
     public $recordModel = SCCategory::class;
     public function index(Request $request)
     {
-        $categories = $this->recordModel::whereNull('parent_id')->with('children_recursive')->get();
-        $this->callHook('beforeIndex', $request, $categories);
-        return SCCategoryResource::collection($categories);
+        try {
+            $categories = $this->recordModel::whereNull('parent_id')->with('children_recursive')->get();
+            $this->callHook('beforeIndex', $request, $categories);
+            return SCCategoryResource::collection($categories);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'message' => 'Something went wrong'
+            ], 500);
+        }
     }
 }
