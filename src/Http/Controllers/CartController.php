@@ -3,24 +3,22 @@
 namespace Rahat1994\SparkcommerceRestRoutes\Http\Controllers;
 
 use Binafy\LaravelCart\Models\Cart;
+use Binafy\LaravelCart\Models\CartItem;
 use Exception;
-use Hashids\Hashids;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Rahat1994\SparkCommerce\Concerns\CanUseDatabaseTransactions;
-use Rahat1994\SparkCommerce\Models\SCProduct;
-use Illuminate\Support\Str;
 use Rahat1994\SparkCommerce\Models\SCAnonymousCart;
-use Rahat1994\SparkCommerce\Models\SCOrder;
+use Rahat1994\SparkCommerce\Models\SCProduct;
 use Rahat1994\SparkcommerceMultivendorRestRoutes\Exceptions\VendorNotSameException;
 use Rahat1994\SparkcommerceRestRoutes\Concerns\CanHandleAnonymousCart;
 use Rahat1994\SparkcommerceRestRoutes\Concerns\CanHandleCart;
+use Rahat1994\SparkcommerceRestRoutes\Concerns\CanHandleCheckout;
 use Rahat1994\SparkcommerceRestRoutes\Concerns\CanHandleCoupon;
 use Rahat1994\SparkcommerceRestRoutes\Concerns\CanRetriveUser;
-use Rahat1994\SparkcommerceRestRoutes\Http\Resources\SCOrderResource;
 use Rahat1994\SparkcommerceRestRoutes\Http\Controllers\SCBaseController;
+use Illuminate\Support\Facades\Validator;
 
 class CartController extends SCBaseController
 {
@@ -29,7 +27,7 @@ class CartController extends SCBaseController
     use CanHandleCart;
     use CanHandleAnonymousCart;
     use CanHandleCoupon;
-
+    use CanHandleCheckout;
     public $recordModel = SCProduct::class;
     // public function __construct()
     // {
@@ -127,21 +125,35 @@ class CartController extends SCBaseController
 
 
 
-    public function removeFromCart(Request $request, $slug, $reference)
-    {
-        $request->validate([
-            'slug' => 'required|string',
-            'reference' => 'string',
-        ]);
+    public function removeFromCart(Request $request, $slug, $reference = null)
+    {   
+        $validatedData = Validator::make(
+            [
+                'slug' => $slug,
+                'reference' => $reference,
+            ],
+            [
+                'slug' => 'required|string',
+                'reference' => 'string|nullable',
+            ]
+        )->validate();
 
         try {
             $user = $this->user();
 
             if ($user !== null) {
-                return $this->removeItemFromCart($request, $slug);
+                return $this->removeItemFromCart($request, $validatedData['slug']);
             }             
-            return $this->removeItemFromAnonymousCart($request, $slug, $reference);
-        } catch (\Throwable $th) {
+            return $this->removeItemFromAnonymousCart($request, $validatedData['slug'], $validatedData['reference']);
+        } catch(ModelNotFoundException $exception){
+            return response()->json(
+                [
+                    // TODO: Add a better message and internatiolization.
+                    "message" => "Unable to locate the resource you requested.",
+                ]
+            );
+        }        
+        catch (\Throwable $th) {
             return response()->json(
                 [
                     'message' => $th->getMessage(),
@@ -150,6 +162,88 @@ class CartController extends SCBaseController
             );
         }      
         
+    }
+
+    public function associateAnonymousCart(Request $request)
+    {
+
+        $request->validate([
+            'reference' => 'required|string',
+        ]);
+        // this controller method will be used to associate the anonymous cart with the user cart
+
+        try{
+            $user = $this->user();
+
+            if (null === $user) {
+                return response()->json(
+                    [
+                        'message' => 'User not found',
+                        'cart' => []
+                    ],
+                    404
+                );
+            }
+    
+            $reference = $request->reference;
+            $anonymousCartId = $this->decodeAnonymousCartReferenceId($reference);
+    
+            if (empty($anonymousCartId)) {
+                return response()->json(
+                    [
+                        // TODO: Add a better message and internatiolization.
+                        'message' => 'Anonnymous cart not found',
+                    ],
+                    404
+                );
+            }
+    
+            $anonymousCart = SCAnonymousCart::findOrFail($anonymousCartId[0]);
+    
+            $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
+    
+            $cartItems = $anonymousCart->cart_content;
+    
+            foreach ($cartItems as $item) {
+                $product = $this->getRecordBySlug($item['slug']);
+    
+                // check if product already exists in the cart
+                $cartItem = $cart->items()->where('itemable_id', $product->id)->first();
+    
+                // if product already exists in the cart, update the quantity
+                if ($cartItem) {
+                    $cartItem->quantity = $item['quantity'];
+                    $cartItem->save();
+                } else {
+                    $cartItem = new CartItem([
+                        'itemable_id' => $product->id,
+                        'itemable_type' => SCProduct::class,
+                        'quantity' => $item['quantity'],
+                    ]);
+                    $cart->items()->save($cartItem);
+                }
+            }
+    
+            $anonymousCart->delete();
+    
+            $cart = $this->loadCartWithAllItems($cart);
+    
+            return response()->json(
+                [
+                    'message' => 'Cart associated successfully',
+                    'cart' => $cart,
+                ],
+                200
+            );
+        } catch (Exception $e) {
+            return response()->json(
+                [
+                    'message' => 'Error associating cart',
+                    'cart' => []
+                ],
+                500
+            );
+        }
     }
     
     public function validateCoupon(Request $request)
@@ -189,6 +283,8 @@ class CartController extends SCBaseController
         // dd($request->all());
         $request->validate([
             "items" => "required|array",
+            "items.*.slug" => "required|string",
+            "items.*.quantity" => "required|integer|min:1",
             "shipping_address" => "required",
             "billing_address" => "required",
             "shipping_method" => "required",
@@ -199,83 +295,20 @@ class CartController extends SCBaseController
         ]);
 
         $user = $this->user();
-        // Assuming you have a Cart model and it's already filled with items
-        $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
-        $items = $request->items;
 
-        $total_amount = 0;
-        $vendor_id = null;
-
-        foreach ($items as $key => $item) {
-            try {
-                $product = SCProduct::where('slug', $item['slug'])->firstOrFail();
-            } catch (ModelNotFoundException $e) {
-                return response()->json(
-                    [
-                        'message' => 'Product not found',
-                        'cart' => []
-                    ],
-                    404
-                );
-            } catch (\Throwable $th) {
-                return response()->json(
-                    [
-                        'message' => $th->getMessage(),
-                        'cart' => []
-                    ],
-                    404
-                );
-            }
-            $vendor_id = $product->vendor_id;
-            $total_amount += ($product->getPrice() * $item['quantity']);
-        }
-
-        if (!$cart || $cart->items->isEmpty()) {
-            throw new Exception("Cart is empty or not found.");
-        }
-
-        // Begin database transaction to ensure data integrity
-        DB::beginTransaction();
         try {
-            // Create a new Order
-            $order = new SCOrder();
-            $order->user_id = $user->id;
-            $order->status = 'pending';
-            $order->items = $cart->items;
-
-            $order->shipping_address = json_encode($request->shipping_address);
-            $order->billing_address = json_encode($request->billing_address);
-            $order->shipping_method = json_encode($request->shipping_method);
-            $order->total_amount = $total_amount;
-
-            $order->tracking_number = Str::random(10);
-
-            $order->discount = $request->discount;
-            $order->user_id = $user->id;
-            $order->vendor_id = $vendor_id;
-            // $order->order_number = $request->order_number;
-
-            // $order->transaction_id = $request->transaction_id;
-            // $order->payment_status = $request->payment_status;
-            // $order->shipping_status = 'pending';
-            // $order->payment_method = $request->payment_method;
-            // Add other order details like shipping address, etc.
-            $order->save();
-
-            // Process payment and update order status if successful
-
-            // Mark cart as processed or delete it
-            $cart->delete(); // or mark as processed
-
-            DB::commit();
-
-            // Send order confirmation to user
-            return SCOrderResource::make($order);
-
-            
-        } catch (Exception $e) {
-            DB::rollBack();
-            throw $e;
+           return $this->checkoutWithItems($request, $user);    
+        } catch (\Throwable $th) {
+            //throw $th;
+            return response()->json(
+                [
+                    // TODO: Add a better message and internatiolization.
+                    'message' => "Something went wrong while processing the order.",
+                    'cart' => []
+                ],
+                500
+            );
         }
+        
     }
 }
