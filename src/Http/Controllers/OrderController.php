@@ -1,11 +1,10 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace Rahat1994\SparkcommerceRestRoutes\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\Order;
 
-class OrderController extends Controller
+class OrderController extends SCBaseController
 {
     /**
      * Display a listing of the orders.
@@ -18,23 +17,12 @@ class OrderController extends Controller
     }
 
     /**
-     * Store a newly created order in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
-     */
-    public function store(Request $request)
-    {
-        // Your code here
-    }
-
-    /**
      * Display the specified order.
      *
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function show($id)
+    public function show($slug)
     {
         // Your code here
     }

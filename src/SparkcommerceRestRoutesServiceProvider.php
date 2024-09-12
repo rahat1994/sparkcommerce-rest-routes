@@ -22,9 +22,8 @@ class SparkcommerceRestRoutesServiceProvider extends PackageServiceProvider
             ->name('sparkcommerce-rest-routes')
             ->hasConfigFile()
             ->hasViews()
-            ->hasRoute('api')
-            ->hasMigration('create_sparkcommerce-rest-routes_table')
-            ->hasCommand(SparkcommerceRestRoutesCommand::class);
+            ->hasRoutes($this->getRoutes())
+            ->hasMigration('create_sparkcommerce-rest-routes_table');
 
         $this->passwordResetLinkChangeForSpa();
     }
@@ -34,5 +33,14 @@ class SparkcommerceRestRoutesServiceProvider extends PackageServiceProvider
         ResetPassword::createUrlUsing(function (User $user, $token) {
             return config('sparkcommerce-rest-routes.frontend_url') . '/reset-password?token=' . $token . '&email=' . $user->getEmailForPasswordReset();
         });
+    }
+
+    protected function getRoutes(): array {
+        // check if the class SparkcommerceMultivendorRestRoutesServiceProvider exists
+
+        if (class_exists('Rahat1994\SparkcommerceMultivendorRestRoutes\SparkcommerceMultivendorRestRoutesServiceProvider')) {
+            return ['api'];
+        }
+        return ['api', 'commerce_apis'];
     }
 }
