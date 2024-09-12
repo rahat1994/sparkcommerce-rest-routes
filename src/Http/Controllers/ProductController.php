@@ -8,7 +8,7 @@ use Rahat1994\SparkCommerce\Models\SCProduct;
 use Rahat1994\SparkcommerceMultivendorRestRoutes\Http\Resources\SCMVProductResource;
 use Rahat1994\SparkcommerceRestRoutes\Http\Resources\SCProductResource;
 
-class ProductController extends Controller
+class ProductController extends SCBaseController
 {
     public function index(Request $request)
     {
