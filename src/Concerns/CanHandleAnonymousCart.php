@@ -209,61 +209,7 @@ trait CanHandleAnonymousCart
         return $anonymousCartId;
     }
 
-    public function associateAnonymousCart(Request $request)
-    {
 
-        $request->validate([
-            'reference' => 'required|string',
-        ]);
-        // this controller method will be used to associate the anonymous cart with the user cart
-
-        $reference = $request->reference;
-        $anonymousCartId = $this->decodeAnonymousCartReferenceId($reference);
-
-        if (empty($anonymousCartId)) {
-            throw new Exception('Cart not found');
-        }
-
-        $anonymousCart = SCAnonymousCart::findOrFail($anonymousCartId[0]);
-
-        $user = $this->user();
-
-        $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
-
-        $cartItems = $anonymousCart->cart_content;
-
-        foreach ($cartItems as $item) {
-            $product = SCProduct::where('slug', $item['slug'])->firstOrFail();
-
-            // check if product already exists in the cart
-            $cartItem = $cart->items()->where('itemable_id', $product->id)->first();
-
-            // if product already exists in the cart, update the quantity
-            if ($cartItem) {
-                $cartItem->quantity = $item['quantity'];
-                $cartItem->save();
-            } else {
-                $cartItem = new CartItem([
-                    'itemable_id' => $product->id,
-                    'itemable_type' => SCProduct::class,
-                    'quantity' => $item['quantity'],
-                ]);
-                $cart->items()->save($cartItem);
-            }
-        }
-
-        $anonymousCart->delete();
-
-        $cart = $this->loadCartWithAllItems($cart);
-
-        return response()->json(
-            [
-                'message' => 'Cart associated successfully',
-                'cart' => $cart,
-            ],
-            200
-        );
-    }
     private function loadAnonymousCartWithAllItems(SCAnonymousCart $cartContent)
     {
         $cartItems = [];
