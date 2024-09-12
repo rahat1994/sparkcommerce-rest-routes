@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password as PasswordRule;
+
 class AuthController extends SCBaseController
 {
     public function login(Request $request)
@@ -29,11 +30,12 @@ class AuthController extends SCBaseController
                 'token' => Auth::user()->createToken($request->device_name)->plainTextToken
             ];
             return response()->json($response, 200);
+            $this->callHook('afterLogin', $request);
         }
-        $this->callHook('afterLogin', $request);
+
         return response()->json([
             'error' => 'Invalid Credentials'
-        ], 401);            
+        ], 401);
     }
 
     public function register(Request $request)
@@ -51,7 +53,7 @@ class AuthController extends SCBaseController
             ],
             'device_name' => 'required',
         ]);
-        
+
         $data = $this->callHook('beforeRegister', $request);
 
         $registerData = $data ?? [
@@ -88,8 +90,8 @@ class AuthController extends SCBaseController
         );
         $this->callHook('afterForgotPasswordEmailSend', $request);
         return $status === Password::RESET_LINK_SENT
-                    ? response()->json(['message' => __($status)], 200)
-                    : response()->json(['message' => __($status)], 400);
+            ? response()->json(['message' => __($status)], 200)
+            : response()->json(['message' => __($status)], 400);
     }
 
     public function resetPassword(Request $request)
@@ -103,7 +105,7 @@ class AuthController extends SCBaseController
         $this->callHook('beforePasswordReset', $request);
         $status = Password::reset(
             $request->only('email', 'password', 'password_confirmation', 'token'),
-            function (User $user,string $password) {
+            function (User $user, string $password) {
                 $user->forceFill([
                     'password' => Hash::make($password)
                 ])->save();
@@ -111,8 +113,8 @@ class AuthController extends SCBaseController
         );
         $this->callHook('afterPasswordReset', $request);
         return $status == Password::PASSWORD_RESET
-                    ? response()->json(['message' => __($status)], 200)
-                    : response()->json(['message' => __($status)], 400);
+            ? response()->json(['message' => __($status)], 200)
+            : response()->json(['message' => __($status)], 400);
     }
 
     public function confirmPassword(Request $request)
@@ -184,7 +186,7 @@ class AuthController extends SCBaseController
                 'message' => 'The provided password does not match our records.'
             ], 400);
         }
-        
+
         $user = $request->user();
         $user->password = bcrypt($request->password);
         $user->save();
