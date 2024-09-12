@@ -4,13 +4,7 @@ namespace Rahat1994\SparkcommerceRestRoutes\Concerns;
 
 use Binafy\LaravelCart\Models\Cart;
 use Binafy\LaravelCart\Models\CartItem;
-use Exception;
-use Hashids\Hashids;
 use Illuminate\Http\Request;
-use Illuminate\Routing\Controller;
-use Rahat1994\SparkCommerce\Models\SCAnonymousCart;
-use Rahat1994\SparkCommerce\Models\SCProduct;
-use Rahat1994\SparkcommerceMultivendorRestRoutes\Http\Resources\SCMVProductResource;
 
 trait CanHandleCart
 {
@@ -30,7 +24,7 @@ trait CanHandleCart
         $user = $this->user();
         try {
 
-            $product = SCProduct::where('slug', $request->slug)->firstOrFail();
+            $product = $this->getRecordBySlug($request->slug);
             $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
             $cartItem = $cart->items()->where('itemable_id', $product->id)->first();    
 
@@ -68,7 +62,7 @@ trait CanHandleCart
                 ],
                 200
             );
-        } 
+        }
         catch (\Throwable $exception) {
             throw $exception;
         }        
@@ -76,30 +70,32 @@ trait CanHandleCart
 
     public function removeItemFromCart(Request $request, $slug, $refernce = null)
     {
-        $product = SCProduct::where('slug', $slug)->firstOrFail();
+        try{
+            $product = $this->getRecordBySlug($slug);
 
-        $user = $this->user();
-
-        $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
-        $cartItem = $cart->items()->where('itemable_id', $product->id)->get();
-        $cart->removeItem($cartItem[0]);
-
-        $cart = $this->loadCartWithAllItems($cart);
-
-        return response()->json(
-            [
-                'message' => 'Product removed from cart successfully',
-                'cart' => $cart,
-            ],
-            200
-        );
-        
+            $user = $this->user();
+    
+            $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
+            $cartItem = $cart->items()->where('itemable_id', $product->id)->get();
+            $cart->removeItem($cartItem[0]);
+    
+            $cart = $this->loadCartWithAllItems($cart);
+    
+            return response()->json(
+                [
+                    'message' => 'Product removed from cart successfully',
+                    'cart' => $cart,
+                ],
+                200
+            );
+        } catch (\Throwable $exception) {
+            throw $exception;
+        }        
     }
 
     public function clearUserCart(Request $request)
     {
         $user = $this->user();
-
         $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
 
         $cart->emptyCart();
@@ -112,18 +108,22 @@ trait CanHandleCart
             200
         );
     }
-    
+        
     private function loadCartWithAllItems(Cart $cart)
     {
         $this->callHook('beforeLoadingCartWithAllItems');
 
         $cartItems = [];
         $cart = $cart->load('items.itemable');
-        // dd($cart);
-        $cart->items()->each(function ($item) use (&$cartItems) {
+        
+        $recourceClassMapping = $this->getResourceClassMapping();
+
+        $cart->items()->each(function ($item) use (&$cartItems, $recourceClassMapping) {
+
+            $resourceClass = $recourceClassMapping[$item->itemable_type] ?? null;
             $temp = [];
             $temp['quantity'] = $item->quantity;
-            $temp['item'] = SCMVProductResource::make($item->itemable);
+            $temp['item'] = $resourceClass::make($item->itemable);
 
             $cartItems[] = $temp;
         });
@@ -152,7 +152,7 @@ trait CanHandleCart
     {
         return [
             'itemable_id' => $product->id,
-            'itemable_type' => SCProduct::class,
+            'itemable_type' => $this->recordModel,
             'quantity' => $request->quantity,
         ];
     }
