@@ -10,7 +10,7 @@ use Rahat1994\SparkcommerceRestRoutes\Http\Resources\SCProductResource;
 
 trait CanInteractWithApiResources
 {
-    protected function getResourceClassMapping(): array
+    protected function getResourceClassMapping()
     {
         // TODO: move this array to config files
         return [
