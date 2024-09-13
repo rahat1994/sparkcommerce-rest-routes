@@ -14,7 +14,7 @@ use Rahat1994\SparkcommerceMultivendorRestRoutes\Http\Resources\SCMVProductResou
 
 trait CanHandleAnonymousCart
 {
-    protected function GetHashIdObject()
+    protected function getHashIdObject()
     {
         $project = strval(config('app.name'));
         return new Hashids($project);
@@ -22,7 +22,7 @@ trait CanHandleAnonymousCart
     public function getAnonymousCart($reference)
     {
         
-        $hashIdObj = $this->GetHashIdObject();
+        $hashIdObj = $this->getHashIdObject();
         $anonymousCartId = $hashIdObj->decode($reference);
         if (empty($anonymousCartId)) {
             throw new Exception('Cart not found');
@@ -47,7 +47,7 @@ trait CanHandleAnonymousCart
 
     public function addItemToAnonymousCart(Request $request, $reference = null){
         
-        $hashIdObj = $this->GetHashIdObject();
+        $hashIdObj = $this->getHashIdObject();
         
         // If no reference is provided, create a new anonymous cart
         if (is_null($reference)) {
@@ -136,7 +136,7 @@ trait CanHandleAnonymousCart
     public function removeItemFromAnonymousCart(Request $request, $slug, $reference){
 
         try {
-            $hashIdObj = $this->GetHashIdObject();
+            $hashIdObj = $this->getHashIdObject();
             $anonymousCartId = $hashIdObj->decode($reference);
 
             $anonymousCart = $this->getAnonymousCartObj($anonymousCartId);
@@ -203,7 +203,7 @@ trait CanHandleAnonymousCart
 
     public function decodeAnonymousCartReferenceId($reference)
     {
-        $hashIds = $this->GetHashIdObject();
+        $hashIds = $this->getHashIdObject();
         $anonymousCartId = $hashIds->decode($reference);
 
         return $anonymousCartId;
@@ -234,7 +234,7 @@ trait CanHandleAnonymousCart
                 if($cartableRecord){
                     $temp = [];
                     $temp['quantity'] = $item['quantity'];
-                    $temp['item'] = $resourceClass::make($cartableRecord);
+                    $temp['item'] = $this->singleModelResource($cartableRecord);
                     $cartItems[] = $temp;
                 }
             }

@@ -5,6 +5,7 @@ namespace Rahat1994\SparkcommerceRestRoutes\Http\Controllers;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Validator;
 use Rahat1994\SparkCommerce\Models\SCOrder;
 use Rahat1994\SparkcommerceRestRoutes\Http\Resources\SCOrderResource;
 
@@ -14,6 +15,9 @@ class OrderController extends SCBaseController
 
     public function index(Request $request)
     {
+        $request->validate([
+            'item_count' => 'nullable|integer',
+        ]);
         // Your code here
         $user = Auth::guard('sanctum')->user();
 
@@ -30,37 +34,40 @@ class OrderController extends SCBaseController
 
         $orders = $this->recordModel::limit($params['limit'])
             ->where('user_id', $params['user_id'])
-            ->orderBy($params['order_by'], $params['order'])
-            ->paginate();
+            ->orderBy($params['order_by'], $params['order']);
+
+        $builder = $this->callHook('orderIndexQueryBuilder', $orders);
+        
+        $orders = $builder ? $builder : $orders;
+        
+        $orders = $orders->paginate($request->item_count);
 
         $data = $this->callHook('afterOrderListFetch', $orders);
 
         $orders = $data ?? $orders;
 
-        return SCOrderResource::collection($orders);
+        return $this->resourceCollection($orders);
     }
 
-    /**
-     * Display the specified order.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
     public function show(Request $request, $trackingNumber)
     {
-        $user = Auth::guard('sanctum')->user();
+        $validatedData = Validator::make(
+            ['tracking_number' => $trackingNumber],
+            ['tracking_number' => 'required|string']
+        )->validate();
 
+        $user = Auth::guard('sanctum')->user();
         try {
 
             $params = [
-                'tracking_number' => $trackingNumber,
+                'tracking_number' => $validatedData['tracking_number'],
             ];
 
-            $data = $this->callHook('singlerderParams', $params);
+            $data = $this->callHook('singleOrderParams', $params);
 
             $params = $data ?? $params;
 
-            $order = SCOrder::where('tracking_number', $params['tracking_number'])
+            $order = $this->recordModel::where('tracking_number', $params['tracking_number'])
                 ->where('user_id', $user->id)
                 ->firstOrFail();
 
@@ -68,7 +75,7 @@ class OrderController extends SCBaseController
 
             $order = $data ?? $order;
 
-            return SCOrderResource::make($order);
+            return $this->singleModelResource($order);
         } catch (ModelNotFoundException $th) {
             //throw $th;
             return response()->json(

@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Auth;
 
 trait CanRetriveUser
 {
-        protected function user()
+    protected function user()
     {
         return Auth::guard('sanctum')->user();
     }

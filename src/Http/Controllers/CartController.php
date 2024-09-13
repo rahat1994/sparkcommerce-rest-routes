@@ -71,8 +71,7 @@ class CartController extends SCBaseController
                 ],
                 500
             );
-        }
-    
+        }    
     }
 
 

@@ -2,6 +2,7 @@
 
 namespace Rahat1994\SparkcommerceRestRoutes\Http\Controllers;
 
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Rahat1994\SparkCommerce\Models\SCProduct;
@@ -25,8 +26,7 @@ class ProductController extends SCBaseController
                 : explode(',', $request->get('categories', ''));
 
             if (empty($categorySlugs)) {
-                $products = $this->recordModel::with('categories')->paginate(10);
-                return SCProductResource::collection($products);
+                $this->getProducts($request);
             }
 
             $products = $this->recordModel::with('categories')
@@ -34,27 +34,49 @@ class ProductController extends SCBaseController
                     return $query->whereHas('categories', function ($query) use ($categorySlugs) {
                         $query->whereIn('slug', $categorySlugs);
                     });
-                })
-                ->paginate(10);
-            $modifiedProducts = $this->callHook('afterFetchingProducts', $products);
-            $products = $modifiedProducts ?? $products;
+                });
+            return $this->getProducts($request, $products);
 
-            return SCProductResource::collection($products);
         } catch (\Throwable $th) {
             return response()->json(['message' => 'Something went wrong'], 500);
         }
     }
 
+    public function getProducts(Request $request, $builder = null){
+        $modifiedRequest = $this->callHook('beforeFetchingProducts', $request);
+        $request = $modifiedRequest ?? $request;
+
+        if ($builder) {
+            $products = $builder->paginate(10);
+        } else {
+            $products = $this->recordModel::with('categories')->paginate(10);
+        }        
+
+        $modifiedProducts = $this->callHook('afterFetchingProducts', $products);
+        $products = $modifiedProducts ?? $products;
+        return $this->resourceCollection($products);
+    }
+
     public function show($slug)
     {
         try {
+            $modifiedRequest = $this->callHook('beforeFetchingProducts', $slug);
+            $slug = $modifiedRequest ?? $slug;
+
             $product = $this->recordModel::where('slug', $slug)->with('sCMVVendor', 'categories')->firstOrFail();
 
-            $modifiedProduct = $this->callHook('beforeShow', $product);
-            $product = $modifiedProduct ?? $product;
+            $modifiedProduct = $this->callHook('afterFetchingProducts', $product);
 
-            return SCMVProductResource::make($product);
-        } catch (\Throwable $th) {
+            if ( null !== $modifiedProduct && $modifiedProduct instanceof $this->recordModel) {
+                $product = $modifiedProduct;
+            }
+
+            return $this->singleModelResource($product);
+        } catch(ModelNotFoundException $e) {
+            return response()->json(['message' => 'resource not found'], 404);
+
+        }
+        catch (\Throwable $th) {
 
             return response()->json(['message' => 'Something went wrong'], 500);
         }
