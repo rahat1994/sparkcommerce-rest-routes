@@ -25,12 +25,14 @@ class AuthController extends SCBaseController
         $loginData = $data ?? $request->only('email', 'password');
         if (Auth::attempt($loginData)) {
 
+            $user = $this->singleModelResource(Auth::user(), User::class);
             $response = [
-                'user' => Auth::user(),
+                'user' => $user,
                 'token' => Auth::user()->createToken($request->device_name)->plainTextToken
             ];
-            return response()->json($response, 200);
             $this->callHook('afterLogin', $request);
+            return response()->json($response, 200);
+            
         }
 
         return response()->json([
@@ -65,7 +67,7 @@ class AuthController extends SCBaseController
             $user = User::create($registerData);
 
             $data = $this->callHook('afterRegister', $request, $user);
-
+            $user = $this->singleModelResource($user, User::class);
             $responseData = $data ?? [
                 'user' => $user,
                 'token' => $user->createToken($request->device_name)->plainTextToken
