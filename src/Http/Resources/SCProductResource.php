@@ -2,11 +2,12 @@
 
 namespace Rahat1994\SparkcommerceRestRoutes\Http\Resources;
 
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class SCProductResource extends JsonResource
 {
-    public function toArray($request)
+    public function toArray(Request $request)
     {
         return [
             'name' => $this->name,

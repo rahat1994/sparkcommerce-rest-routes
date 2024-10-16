@@ -2,6 +2,7 @@
 
 namespace Rahat1994\SparkcommerceRestRoutes\Http\Controllers;
 
+use App\Models\Book;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -11,7 +12,7 @@ use Rahat1994\SparkcommerceRestRoutes\Http\Resources\SCProductResource;
 
 class ProductController extends SCBaseController
 {
-    public $recordModel = SCProduct::class;
+    public $recordModel = Book::class;
 
     public function index(Request $request)
     {
