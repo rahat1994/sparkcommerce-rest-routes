@@ -29,10 +29,6 @@ class CartController extends SCBaseController
     use CanHandleCoupon;
     use CanHandleCheckout;
     public $recordModel = SCProduct::class;
-    // public function __construct()
-    // {
-    //     self::$recordModel = SCProduct::class;
-    // }
 
     public function getCart(Request $request, $reference = null) : JsonResponse
     {
@@ -249,7 +245,6 @@ class CartController extends SCBaseController
     {
         $request->validate([
             'coupon_code' => 'required|string',
-            'reference' => 'string|sometimes',
         ]);
         $couponData = $this->couponData($request->coupon_code);
 
@@ -276,10 +271,8 @@ class CartController extends SCBaseController
             );
         }
     }
-
     public function checkout(Request $request)
     {
-        // dd($request->all());
         $request->validate([
             "items" => "required|array",
             "items.*.slug" => "required|string",
@@ -298,7 +291,6 @@ class CartController extends SCBaseController
         try {
            return $this->checkoutWithItems($request, $user);    
         } catch (\Throwable $th) {
-            //throw $th;
             return response()->json(
                 [
                     // TODO: Add a better message and internatiolization.
