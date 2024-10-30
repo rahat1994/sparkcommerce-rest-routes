@@ -12,12 +12,11 @@ trait CanInteractWithApiResources
 {
     protected function getResourceClassMapping()
     {
-        // TODO: move this array to config files
-        return [
+        return config('sparkcommerce-rest-routes.resource_class_mapping', [
             SCProduct::class => SCProductResource::class,
             SCCategory::class => SCCategoryResource::class,
             SCOrder::class => SCOrderResource::class,
-        ];
+        ]);
     }
 
     protected function getResourceClass($model)
