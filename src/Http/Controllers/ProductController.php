@@ -13,7 +13,7 @@ class ProductController extends SCBaseController
 {
     public $recordModel = SCProduct::class;
 
-    public function index(Request $request)
+    public function index(Request $request): mixed
     {
         $request->validate([
             'page' => 'integer',

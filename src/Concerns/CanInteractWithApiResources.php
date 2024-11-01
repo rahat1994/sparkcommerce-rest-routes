@@ -32,7 +32,6 @@ trait CanInteractWithApiResources
         $resourceClass = $this->getResourceClass($model);
         return $resourceClass::collection($data);
     }
-
     protected function singleModelResource($data, $model = null)
     {
         $model = $model ?? $this->recordModel;

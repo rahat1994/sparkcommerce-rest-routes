@@ -4,26 +4,14 @@ namespace Rahat1994\SparkcommerceRestRoutes\Concerns;
 
 use Carbon\Carbon;
 use Exception;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log as FacadesLog;
 use Rahat1994\SparkCommerce\Models\SCCoupon;
 
 trait CanHandleCoupon
 {
-    protected function couponData(string $couponCode)
-    {
-        try {
-            $coupon = SCCoupon::where('coupon_code', $couponCode)
-                ->firstOrFail();
-        } catch (\Throwable $th) {
-            FacadesLog::error($th->getMessage());
-
-            return false;
-        }
-
-        // validate coupons
-        return false;
+    protected function couponData(string $couponCode): SCCoupon
+    {   
+        return SCCoupon::where('coupon_code', $couponCode)->firstOrFail();    
     }
 
     protected function applyCoupon($cart, SCCoupon $coupon)
@@ -74,11 +62,9 @@ trait CanHandleCoupon
 
         if ($couponIncludedProducts->isNotEmpty()) {
             $cartItems = $cart->items;
-
+            
             foreach ($cartItems as $cartItem) {
-                $product = $cartItem->itemable;
-
-                
+                $product = $cartItem->itemable;                
             }
         }
 

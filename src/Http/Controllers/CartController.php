@@ -246,12 +246,27 @@ class CartController extends SCBaseController
         $request->validate([
             'coupon_code' => 'required|string',
         ]);
-        $couponData = $this->couponData($request->coupon_code);
+        try{
+            $couponData = $this->couponData($request->coupon_code);
+        } catch (ModelNotFoundException $exception) {
+            return response()->json([
+                'message' => 'Couopn not found',
+            ],
+            400);
+        } catch (\Throwable $th) {
+            return response()->json(
+                [
+                    'message' => 'Invalid coupon code',
+                ],
+                400
+            );
+        }
+        
 
         if ($couponData) {
 
             $cart = $this->getCartAccordingToLoginType($request->reference);
-
+            // $this->applyCoupon($cart, $couponData);
             // now process the cart and apply the coupon
 
             return response()->json(
