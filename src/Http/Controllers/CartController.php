@@ -246,45 +246,46 @@ class CartController extends SCBaseController
         $request->validate([
             'coupon_code' => 'required|string',
         ]);
-        try{
-            $couponData = $this->couponData($request->coupon_code);
-        } catch (ModelNotFoundException $exception) {
-            return response()->json([
-                'message' => 'Couopn not found',
-            ],
-            400);
-        } catch (\Throwable $th) {
+
+        $user = $this->user();
+        $cartItems = $this->getCartWithItemObjects($user->id);
+        $cart  = $this->getUserCart($user->id);
+
+        $shouldContinue = $this->couponValidationShouldContinue($cart, $request->coupon_code);
+
+        if (!$shouldContinue) {
             return response()->json(
                 [
-                    'message' => 'Invalid coupon code',
+                    'message' => 'Coupon cannot be applied',
                 ],
                 400
             );
         }
-        
 
-        if ($couponData) {
-
-            $cart = $this->getCartAccordingToLoginType($request->reference);
-            // $this->applyCoupon($cart, $couponData);
-            // now process the cart and apply the coupon
-
+        try {
+            $couponData = $this->couponData($request->coupon_code);
+            $this->applyCoupon($cart, $couponData);
             return response()->json(
                 [
                     'message' => 'Coupon applied successfully',
-                    'cart' => [],
+                    'cart' => $cart,
                 ],
                 200
             );
-        } else {
+        } catch (Exception $e) {
+            dd($e);
             return response()->json(
                 [
-                    'message' => 'Invalid coupon code',
-                    'cart' => [],
+                    'message' => $e->getMessage(),
+                    'cart' => $cart,
                 ],
                 400
             );
         }
+    }
+
+    protected function couponValidationShouldContinue($cart, $couponCode){
+        return true;
     }
     public function checkout(Request $request)
     {

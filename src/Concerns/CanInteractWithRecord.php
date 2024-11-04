@@ -13,6 +13,12 @@ trait CanInteractWithRecord
         return $recordModel::where('slug', $slug)->firstOrFail();
     }
 
+    protected function getRecordById(int $id, string $recordModel = null)
+    {
+        $recordModel = $recordModel ?? $this->recordModel;
+        return $recordModel::findOrFail($id);
+    }
+
     protected function getRecordsByItemTypeAndSlugs(string $itemType, array $slugs): Collection
     {
         return $itemType::whereIn('slug', $slugs)->get();

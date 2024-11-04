@@ -4,6 +4,7 @@ namespace Rahat1994\SparkcommerceRestRoutes\Concerns;
 
 use Binafy\LaravelCart\Models\Cart;
 use Binafy\LaravelCart\Models\CartItem;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 
 trait CanHandleCart
@@ -68,6 +69,12 @@ trait CanHandleCart
         }        
     }
 
+    public function getUserCart(int $userId)
+    {
+        return Cart::query()->firstOrCreate(['user_id' => $userId]);
+
+    }
+
     public function removeItemFromCart(Request $request, $slug, $refernce = null)
     {
         try{
@@ -75,7 +82,7 @@ trait CanHandleCart
 
             $user = $this->user();
     
-            $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
+            $cart = $this->getUserCart($user->id);
             $cartItem = $cart->items()->where('itemable_id', $product->id)->get();
             $cart->removeItem($cartItem[0]);
     
@@ -138,6 +145,19 @@ trait CanHandleCart
         return $cart;
     }
 
+
+    public function getCartTotalAmount($cart)
+    {
+        $items = $cart->items;
+        $total_amount = 0;
+        
+        foreach ($items as $key => $item) {            
+            $product = $this->getRecordById($item->itemable_id);
+            $total_amount += ($product->getPrice() * $item['quantity']);
+        }
+
+        return $total_amount;
+    }
     public function mutateDataBeforeLoadingCartWithAllItems($cart)
     {
         return $cart;

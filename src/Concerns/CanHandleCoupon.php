@@ -26,8 +26,9 @@ trait CanHandleCoupon
         if (Carbon::now()->greaterThan($couponEndDate) || Carbon::now()->lessThan($couponStartDate)) {
             throw new Exception('Coupon is not valid');
         }
+        dd($cart);
         // check the minimum amount of the coupon
-        $cartTotalAmount = $cart->total_amount;
+        $cartTotalAmount = $this->getCartTotalAmount($cart);
         $couponMinimumAmount = $coupon->minimum_amount;
 
         if ($couponMinimumAmount !== null && $cartTotalAmount < $couponMinimumAmount) {
@@ -56,10 +57,9 @@ trait CanHandleCoupon
             throw new Exception('Coupon usage limit per user has been reached');
         }
 
-
         // check if the coupon has included products
         $couponIncludedProducts = $coupon->includedProducts;
-
+        dd($couponIncludedProducts);
         if ($couponIncludedProducts->isNotEmpty()) {
             $cartItems = $cart->items;
             
