@@ -30,7 +30,7 @@ class CartController extends SCBaseController
     use CanHandleCheckout;
     public $recordModel = SCProduct::class;
 
-    public function getCart(Request $request, $reference = null) : JsonResponse
+    public function getCart(Request $request, $reference = null): JsonResponse
     {
         $request->validate([
             'reference' => 'nullable|string',
@@ -56,7 +56,7 @@ class CartController extends SCBaseController
         if (null !== $user) {
             return $this->getCartWithItemObjects($user->id);
         }
-        
+
         try {
             return $this->getAnonymousCart($reference);
         } catch (\Throwable $th) {
@@ -67,7 +67,7 @@ class CartController extends SCBaseController
                 ],
                 500
             );
-        }    
+        }
     }
 
 
@@ -82,14 +82,14 @@ class CartController extends SCBaseController
         $replaceExisting = is_null($request->replace_existing) ? false : $request->replace_existing;
 
         $user = $this->user();
-        
-        try{
+
+        try {
             if ($user !== null) {
                 return $this->addItemToCart($request);
-            } 
-    
+            }
+
             return $this->addItemToAnonymousCart($request, $reference);
-        } catch (VendorNotSameException $exception){
+        } catch (VendorNotSameException $exception) {
             return response()->json(
                 [
                     // TODO: Add a better message and internatiolization.
@@ -97,7 +97,7 @@ class CartController extends SCBaseController
                 ],
                 400
             );
-        } catch(ModelNotFoundException $exception){
+        } catch (ModelNotFoundException $exception) {
             return response()->json(
                 [
                     // TODO: Add a better message and internatiolization.
@@ -105,9 +105,7 @@ class CartController extends SCBaseController
                 ],
                 404
             );
-
-        }        
-        catch (\Throwable $th) {
+        } catch (\Throwable $th) {
             return response()->json(
                 [
                     // TODO: Add a better message and internatiolization.
@@ -115,13 +113,13 @@ class CartController extends SCBaseController
                 ],
                 400
             );
-        }        
+        }
     }
 
 
 
     public function removeFromCart(Request $request, $slug, $reference = null)
-    {   
+    {
         $validatedData = Validator::make(
             [
                 'slug' => $slug,
@@ -138,25 +136,23 @@ class CartController extends SCBaseController
 
             if ($user !== null) {
                 return $this->removeItemFromCart($request, $validatedData['slug']);
-            }             
+            }
             return $this->removeItemFromAnonymousCart($request, $validatedData['slug'], $validatedData['reference']);
-        } catch(ModelNotFoundException $exception){
+        } catch (ModelNotFoundException $exception) {
             return response()->json(
                 [
                     // TODO: Add a better message and internatiolization.
                     "message" => "Unable to locate the resource you requested.",
                 ]
             );
-        }        
-        catch (\Throwable $th) {
+        } catch (\Throwable $th) {
             return response()->json(
                 [
                     'message' => $th->getMessage(),
                 ],
                 400
             );
-        }      
-        
+        }
     }
 
     public function associateAnonymousCart(Request $request)
@@ -167,7 +163,7 @@ class CartController extends SCBaseController
         ]);
         // this controller method will be used to associate the anonymous cart with the user cart
 
-        try{
+        try {
             $user = $this->user();
 
             if (null === $user) {
@@ -179,10 +175,10 @@ class CartController extends SCBaseController
                     404
                 );
             }
-    
+
             $reference = $request->reference;
             $anonymousCartId = $this->decodeAnonymousCartReferenceId($reference);
-    
+
             if (empty($anonymousCartId)) {
                 return response()->json(
                     [
@@ -192,19 +188,19 @@ class CartController extends SCBaseController
                     404
                 );
             }
-    
+
             $anonymousCart = SCAnonymousCart::findOrFail($anonymousCartId[0]);
-    
+
             $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
-    
+
             $cartItems = $anonymousCart->cart_content;
-    
+
             foreach ($cartItems as $item) {
                 $product = $this->getRecordBySlug($item['slug']);
-    
+
                 // check if product already exists in the cart
                 $cartItem = $cart->items()->where('itemable_id', $product->id)->first();
-    
+
                 // if product already exists in the cart, update the quantity
                 if ($cartItem) {
                     $cartItem->quantity = $item['quantity'];
@@ -218,11 +214,11 @@ class CartController extends SCBaseController
                     $cart->items()->save($cartItem);
                 }
             }
-    
+
             $anonymousCart->delete();
-    
+
             $cart = $this->loadCartWithAllItems($cart);
-    
+
             return response()->json(
                 [
                     'message' => 'Cart associated successfully',
@@ -240,7 +236,7 @@ class CartController extends SCBaseController
             );
         }
     }
-    
+
     public function validateCoupon(Request $request)
     {
         $request->validate([
@@ -253,6 +249,7 @@ class CartController extends SCBaseController
 
         $shouldContinue = $this->couponValidationShouldContinue($cart, $request->coupon_code);
 
+        $this->validateCouponCode($request->coupon_code);
         if (!$shouldContinue) {
             return response()->json(
                 [
@@ -284,7 +281,8 @@ class CartController extends SCBaseController
         }
     }
 
-    protected function couponValidationShouldContinue($cart, $couponCode){
+    protected function couponValidationShouldContinue($cart, $couponCode)
+    {
         return true;
     }
     public function checkout(Request $request)
@@ -305,7 +303,7 @@ class CartController extends SCBaseController
         $user = $this->user();
 
         try {
-           return $this->checkoutWithItems($request, $user);    
+            return $this->checkoutWithItems($request, $user);
         } catch (\Throwable $th) {
             return response()->json(
                 [
@@ -316,6 +314,5 @@ class CartController extends SCBaseController
                 500
             );
         }
-        
     }
 }

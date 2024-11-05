@@ -27,7 +27,7 @@ trait CanHandleCart
 
             $product = $this->getRecordBySlug($request->slug);
             $cart = Cart::query()->firstOrCreate(['user_id' => $user->id]);
-            $cartItem = $cart->items()->where('itemable_id', $product->id)->first();    
+            $cartItem = $cart->items()->where('itemable_id', $product->id)->first();
 
             if ($cartItem) {
                 $this->beginDatabaseTransaction();
@@ -36,7 +36,7 @@ trait CanHandleCart
 
                 $cartItem->quantity = $quantity;
                 $cartItem->save();
-                
+
                 $this->commitDatabaseTransaction();
 
                 $this->callHook('afterUpdatingCartItem');
@@ -45,7 +45,7 @@ trait CanHandleCart
                 $this->beginDatabaseTransaction();
 
                 $data = $this->beforeAddingItemToCart($cart, $product, $request);
-    
+
                 $cartItem = new CartItem($data);
 
                 $cart->items()->save($cartItem);
@@ -54,8 +54,8 @@ trait CanHandleCart
 
                 $this->commitDatabaseTransaction();
             }
-            $cart = $this->loadCartWithAllItems($cart);   
-            
+            $cart = $this->loadCartWithAllItems($cart);
+
             return response()->json(
                 [
                     'message' => 'Product added to cart successfully',
@@ -63,31 +63,29 @@ trait CanHandleCart
                 ],
                 200
             );
-        }
-        catch (\Throwable $exception) {
+        } catch (\Throwable $exception) {
             throw $exception;
-        }        
+        }
     }
 
     public function getUserCart(int $userId)
     {
         return Cart::query()->firstOrCreate(['user_id' => $userId]);
-
     }
 
     public function removeItemFromCart(Request $request, $slug, $refernce = null)
     {
-        try{
+        try {
             $product = $this->getRecordBySlug($slug);
 
             $user = $this->user();
-    
+
             $cart = $this->getUserCart($user->id);
             $cartItem = $cart->items()->where('itemable_id', $product->id)->get();
             $cart->removeItem($cartItem[0]);
-    
+
             $cart = $this->loadCartWithAllItems($cart);
-    
+
             return response()->json(
                 [
                     'message' => 'Product removed from cart successfully',
@@ -97,7 +95,7 @@ trait CanHandleCart
             );
         } catch (\Throwable $exception) {
             throw $exception;
-        }        
+        }
     }
 
     public function clearUserCart(Request $request)
@@ -115,14 +113,14 @@ trait CanHandleCart
             200
         );
     }
-        
+
     private function loadCartWithAllItems(Cart $cart)
     {
         $this->callHook('beforeLoadingCartWithAllItems');
 
         $cartItems = [];
         $cart = $cart->load('items.itemable');
-        
+
         $recourceClassMapping = $this->getResourceClassMapping();
 
         $cart->items()->each(function ($item) use (&$cartItems, $recourceClassMapping) {
@@ -138,10 +136,10 @@ trait CanHandleCart
         $this->callHook('afterLoadingCartWithAllItems');
 
         return $cartItems;
-        
     }
 
-    public function mutateDataBeoforeLoadingAllItems($cart){
+    public function mutateDataBeoforeLoadingAllItems($cart)
+    {
         return $cart;
     }
 
@@ -150,14 +148,15 @@ trait CanHandleCart
     {
         $items = $cart->items;
         $total_amount = 0;
-        
-        foreach ($items as $key => $item) {            
+
+        foreach ($items as $key => $item) {
             $product = $this->getRecordById($item->itemable_id);
             $total_amount += ($product->getPrice() * $item['quantity']);
         }
 
         return $total_amount;
     }
+
     public function mutateDataBeforeLoadingCartWithAllItems($cart)
     {
         return $cart;

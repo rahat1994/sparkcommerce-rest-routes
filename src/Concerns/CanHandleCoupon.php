@@ -10,8 +10,43 @@ use Rahat1994\SparkCommerce\Models\SCCoupon;
 trait CanHandleCoupon
 {
     protected function couponData(string $couponCode): SCCoupon
-    {   
-        return SCCoupon::where('coupon_code', $couponCode)->firstOrFail();    
+    {
+        return SCCoupon::where('coupon_code', $couponCode)->firstOrFail();
+    }
+
+    protected function checkDateConstraint(SCCoupon $coupon)
+    {
+        $couponEndDate = $coupon->end_date;
+        $couponStartDate = $coupon->start_date;
+
+        if (Carbon::now()->greaterThan($couponEndDate) || Carbon::now()->lessThan($couponStartDate)) {
+            throw new Exception('Coupon is not valid');
+        }
+    }
+
+    protected function checkCartTotalCostConstraint($cart, SCCoupon $coupon)
+    {
+        $cartTotalAmount = $this->getCartTotalAmount($cart);
+        $couponMinimumAmount = $coupon->minimum_amount;
+
+        if ($couponMinimumAmount !== null && $cartTotalAmount < $couponMinimumAmount) {
+            throw new Exception('Cart total amount is less than the minimum amount required for the coupon. Minimum amount required: ' . $couponMinimumAmount);
+        }
+
+        $couponMaximumAmount = $coupon->maximum_amount;
+
+        if ($couponMaximumAmount !== null && $cartTotalAmount > $couponMaximumAmount) {
+            throw new Exception('Cart total amount is greater than the maximum amount required for the coupon. Maximum amount allowed: ' . $couponMaximumAmount);
+        }
+    }
+
+    protected function checkCouponUsageLimit($coupon)
+    {
+        $couponUsageLimit = $coupon->usage_limit;
+
+        if ($couponUsageLimit !== 0 && $couponUsageLimit <= $coupon->usage_count) {
+            throw new Exception('Coupon usage limit has been reached');
+        }
     }
 
     protected function applyCoupon($cart, SCCoupon $coupon)
@@ -20,27 +55,9 @@ trait CanHandleCoupon
         $couponType = $coupon->coupon_type;
 
         // check the end date & start date of the coupon
-        $couponEndDate = $coupon->end_date;
-        $couponStartDate = $coupon->start_date;
-
-        if (Carbon::now()->greaterThan($couponEndDate) || Carbon::now()->lessThan($couponStartDate)) {
-            throw new Exception('Coupon is not valid');
-        }
-        dd($cart);
         // check the minimum amount of the coupon
-        $cartTotalAmount = $this->getCartTotalAmount($cart);
-        $couponMinimumAmount = $coupon->minimum_amount;
-
-        if ($couponMinimumAmount !== null && $cartTotalAmount < $couponMinimumAmount) {
-            throw new Exception('Cart total amount is less than the minimum amount required for the coupon');
-        }
-
         // check the maximum amount of the coupon
-        $couponMaximumAmount = $coupon->maximum_amount;
 
-        if ($couponMaximumAmount!== null && $cartTotalAmount > $couponMaximumAmount) {
-            throw new Exception('Cart total amount is greater than the maximum amount required for the coupon');
-        }
 
         // check the usage limit of the coupon
         $couponUsageLimit = $coupon->usage_limit;
@@ -62,9 +79,9 @@ trait CanHandleCoupon
         dd($couponIncludedProducts);
         if ($couponIncludedProducts->isNotEmpty()) {
             $cartItems = $cart->items;
-            
+
             foreach ($cartItems as $cartItem) {
-                $product = $cartItem->itemable;                
+                $product = $cartItem->itemable;
             }
         }
 
