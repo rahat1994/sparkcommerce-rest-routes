@@ -247,34 +247,43 @@ class CartController extends SCBaseController
         $cartItems = $this->getCartWithItemObjects($user->id);
         $cart  = $this->getUserCart($user->id);
 
-        $shouldContinue = $this->couponValidationShouldContinue($cart, $request->coupon_code);
+        // here we can use this method to check if the coupon can be applied to the cart
+        // before running anymore validations
+        [$shouldContinue, $message] = $this->couponValidationShouldContinue($cart, $request->coupon_code);
 
-        $this->validateCouponCode($request->coupon_code);
         if (!$shouldContinue) {
             return response()->json(
                 [
-                    'message' => 'Coupon cannot be applied',
+                    'message' => $message,
                 ],
                 400
             );
         }
-
         try {
+
             $couponData = $this->couponData($request->coupon_code);
-            $this->applyCoupon($cart, $couponData);
+            $this->checkDateConstraint($couponData);
+            $this->checkCartTotalCostConstraint($cart, $couponData);
+            $this->checkCouponUsageLimit($couponData);
+            $this->checkUsageLimitPerUser($user, $couponData);
+            $this->checkCouponIncludedProducts($cart, $couponData);
+            $totalAmount = $this->getCartTotalAmount($cart);
+
+            $discount = $this->calculateDiscount($totalAmount, $couponData, $cart);
+
+            //there should be system where cart is linked to a coupon.
             return response()->json(
                 [
-                    'message' => 'Coupon applied successfully',
+                    'message' => 'Valid Coupon',
                     'cart' => $cart,
+                    'discount' => $discount,
                 ],
                 200
             );
         } catch (Exception $e) {
-            dd($e);
             return response()->json(
                 [
                     'message' => $e->getMessage(),
-                    'cart' => $cart,
                 ],
                 400
             );
@@ -283,8 +292,9 @@ class CartController extends SCBaseController
 
     protected function couponValidationShouldContinue($cart, $couponCode)
     {
-        return true;
+        return [true, ''];
     }
+
     public function checkout(Request $request)
     {
         $request->validate([

@@ -6,6 +6,7 @@ use Binafy\LaravelCart\Models\Cart;
 use Binafy\LaravelCart\Models\CartItem;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
+use Rahat1994\SparkCommerce\Models\SCProduct;
 
 trait CanHandleCart
 {
@@ -150,7 +151,7 @@ trait CanHandleCart
         $total_amount = 0;
 
         foreach ($items as $key => $item) {
-            $product = $this->getRecordById($item->itemable_id);
+            $product = $this->getRecordById($item->itemable_id, SCProduct::class);
             $total_amount += ($product->getPrice() * $item['quantity']);
         }
 
