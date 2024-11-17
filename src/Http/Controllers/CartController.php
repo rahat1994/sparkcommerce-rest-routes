@@ -247,15 +247,6 @@ class CartController extends SCBaseController
 
         try {
             $result = $this->validateAndApplyCoupon($user, $request->coupon_code);
-
-            if (isset($result['message'])) {
-                return response()->json(
-                    [
-                        'message' => $result['message'],
-                    ],
-                    400
-                );
-            }
             //there should be system where cart is linked to a coupon.
             return response()->json(
                 [
@@ -283,12 +274,7 @@ class CartController extends SCBaseController
         [$shouldContinue, $message] = $this->couponValidationShouldContinue($cart, $couponCode);
 
         if (!$shouldContinue) {
-            return response()->json(
-                [
-                    'message' => $message,
-                ],
-                400
-            );
+            throw new Exception($message);
         }
 
         $couponData = $this->couponData($couponCode);
