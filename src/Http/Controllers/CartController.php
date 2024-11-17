@@ -305,7 +305,7 @@ class CartController extends SCBaseController
             "billing_address" => "required",
             "shipping_method" => "required",
             "total_amount" => "required",
-            "discount" => "sometimes",
+            "coupon_code" => "sometimes",
             "payment_method" => "required",
             "transaction_id" => "required",
         ]);
