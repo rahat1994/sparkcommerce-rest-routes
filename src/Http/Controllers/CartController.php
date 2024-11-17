@@ -237,46 +237,31 @@ class CartController extends SCBaseController
         }
     }
 
-    public function validateCoupon(Request $request)
+    public function applyCoupon(Request $request)
     {
         $request->validate([
             'coupon_code' => 'required|string',
         ]);
 
         $user = $this->user();
-        $cartItems = $this->getCartWithItemObjects($user->id);
-        $cart  = $this->getUserCart($user->id);
 
-        // here we can use this method to check if the coupon can be applied to the cart
-        // before running anymore validations
-        [$shouldContinue, $message] = $this->couponValidationShouldContinue($cart, $request->coupon_code);
-
-        if (!$shouldContinue) {
-            return response()->json(
-                [
-                    'message' => $message,
-                ],
-                400
-            );
-        }
         try {
+            $result = $this->validateAndApplyCoupon($user, $request->coupon_code);
 
-            $couponData = $this->couponData($request->coupon_code);
-            $this->checkDateConstraint($couponData);
-            $this->checkCartTotalCostConstraint($cart, $couponData);
-            $this->checkCouponUsageLimit($couponData);
-            $this->checkUsageLimitPerUser($user, $couponData);
-            $this->checkCouponIncludedProducts($cart, $couponData);
-            $totalAmount = $this->getCartTotalAmount($cart);
-
-            $discount = $this->calculateDiscount($totalAmount, $couponData, $cart);
-
+            if (isset($result['message'])) {
+                return response()->json(
+                    [
+                        'message' => $result['message'],
+                    ],
+                    400
+                );
+            }
             //there should be system where cart is linked to a coupon.
             return response()->json(
                 [
                     'message' => 'Valid Coupon',
-                    'cart' => $cart,
-                    'discount' => $discount,
+                    'cart' => $result['cart'],
+                    'discount' => $result['discount'],
                 ],
                 200
             );
@@ -288,6 +273,38 @@ class CartController extends SCBaseController
                 400
             );
         }
+    }
+
+    protected function validateAndApplyCoupon($user, $couponCode)
+    {
+        $cart  = $this->getUserCart($user->id);
+        // here we can use this method to check if the coupon can be applied to the cart
+        // before running anymore validations
+        [$shouldContinue, $message] = $this->couponValidationShouldContinue($cart, $couponCode);
+
+        if (!$shouldContinue) {
+            return response()->json(
+                [
+                    'message' => $message,
+                ],
+                400
+            );
+        }
+
+        $couponData = $this->couponData($couponCode);
+        $this->checkDateConstraint($couponData);
+        $this->checkCartTotalCostConstraint($cart, $couponData);
+        $this->checkCouponUsageLimit($couponData);
+        $this->checkUsageLimitPerUser($user, $couponData);
+        $this->checkCouponIncludedProducts($cart, $couponData);
+        $totalAmount = $this->getCartTotalAmount($cart);
+
+        $discount = $this->calculateDiscount($totalAmount, $couponData, $cart);
+
+        return [
+            'cart' => $cart,
+            'discount' => $discount,
+        ];
     }
 
     protected function couponValidationShouldContinue($cart, $couponCode)
@@ -313,6 +330,7 @@ class CartController extends SCBaseController
         $user = $this->user();
 
         try {
+            $result = $this->validateAndApplyCoupon($user, $request->coupon_code);
             return $this->checkoutWithItems($request, $user);
         } catch (\Throwable $th) {
             return response()->json(
