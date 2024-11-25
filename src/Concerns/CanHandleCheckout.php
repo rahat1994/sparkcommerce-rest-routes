@@ -21,7 +21,7 @@ trait CanHandleCheckout
 
             $totalAmount = 0;
 
-            // $items = $this->beforeProcessingCheckoutCartItems($items);
+            $items = $this->beforeProcessingCheckoutCartItems($items);
             $totalAmount = $this->getCartTotalAmount($cart);
             $amountAfterDiscount = $totalAmount - $discountAmount;
 
@@ -45,7 +45,7 @@ trait CanHandleCheckout
                 'discount' => $discountAmount,
                 'total_amount' => $amountAfterDiscount,
             ];
-
+            // dd($cart->items[0]->itemable->vendor_id);
             $orderData = [
                 'user_id' => $user->id,
                 'status' => 'pending',
