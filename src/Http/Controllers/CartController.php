@@ -8,6 +8,7 @@ use Exception;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Log;
 use Rahat1994\SparkCommerce\Concerns\CanUseDatabaseTransactions;
 use Rahat1994\SparkCommerce\Models\SCAnonymousCart;
 use Rahat1994\SparkCommerce\Models\SCProduct;
@@ -327,6 +328,7 @@ class CartController extends SCBaseController
             $discountArray = $couponResult['discount'];
             return $this->checkoutWithItems($request, $user, $discountArray);
         } catch (\Throwable $th) {
+            Log::error($th);
             return response()->json(
                 [
                     // TODO: Add a better message and internatiolization.

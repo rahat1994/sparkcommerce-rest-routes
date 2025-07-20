@@ -46,7 +46,7 @@ trait CanHandleCheckout
                 'discount' => $discountArray['discount'] ?? 0,
                 'total_amount' => $amountAfterDiscount,
             ];
-
+            // dd($cart->items[0]->itemable->vendor_id);
             $orderData = [
                 'user_id' => $user->id,
                 'status' => 'pending',
