@@ -327,7 +327,6 @@ class CartController extends SCBaseController
             $discountArray = $couponResult['discount'];
             return $this->checkoutWithItems($request, $user, $discountArray);
         } catch (\Throwable $th) {
-            dd($th);
             return response()->json(
                 [
                     // TODO: Add a better message and internatiolization.
