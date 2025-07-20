@@ -28,6 +28,7 @@ class CartController extends SCBaseController
     use CanHandleAnonymousCart;
     use CanHandleCoupon;
     use CanHandleCheckout;
+
     public $recordModel = SCProduct::class;
 
     public function getCart(Request $request, $reference = null): JsonResponse
@@ -268,7 +269,14 @@ class CartController extends SCBaseController
 
     protected function validateAndApplyCoupon($user, $couponCode)
     {
+
         $cart  = $this->getUserCart($user->id);
+        if($couponCode === null || $couponCode === '') {
+            return [
+                'cart' => $cart,
+                'discount' => 0,
+            ];
+        }
         // here we can use this method to check if the coupon can be applied to the cart
         // before running anymore validations
         [$shouldContinue, $message] = $this->couponValidationShouldContinue($cart, $couponCode);
@@ -286,7 +294,6 @@ class CartController extends SCBaseController
         $totalAmount = $this->getCartTotalAmount($cart);
 
         $discount = $this->calculateDiscount($totalAmount, $couponData, $cart);
-
         return [
             'cart' => $cart,
             'discount' => $discount,
@@ -308,7 +315,7 @@ class CartController extends SCBaseController
             "billing_address" => "required",
             "shipping_method" => "required",
             "total_amount" => "required",
-            "coupon_code" => "sometimes",
+            "coupon_code" => "sometimes|string",
             "payment_method" => "required",
             "transaction_id" => "required",
         ]);
@@ -316,9 +323,11 @@ class CartController extends SCBaseController
         $user = $this->user();
 
         try {
-            $result = $this->validateAndApplyCoupon($user, $request->coupon_code);
-            return $this->checkoutWithItems($request, $user);
+            $couponResult = $this->validateAndApplyCoupon($user, $request->coupon_code);
+            $discountArray = $couponResult['discount'];
+            return $this->checkoutWithItems($request, $user, $discountArray);
         } catch (\Throwable $th) {
+            dd($th);
             return response()->json(
                 [
                     // TODO: Add a better message and internatiolization.
@@ -328,5 +337,9 @@ class CartController extends SCBaseController
                 500
             );
         }
+    }
+
+    public function afterOrderIsSaved($order){
+
     }
 }

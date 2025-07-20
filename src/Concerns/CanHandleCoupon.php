@@ -126,9 +126,9 @@ trait CanHandleCoupon
         // check if the coupon has included products
 
         // check the coupon type
-        if ($couponType == 'fixed') {
+        if ($couponType == 'fixed_cart_discount') {
             $cart->total_amount = $cart->total_amount - $coupon->coupon_amount;
-        } else {
+        } else if ($couponType == 'percentage_discount') {
             $cart->total_amount = $cart->total_amount - ($cart->total_amount * $coupon->coupon_amount / 100);
         }
 
@@ -168,9 +168,9 @@ trait CanHandleCoupon
                 $product = $cartItem->itemable;
                 $productTotalAmount = $product->getPrice() * $cartItem->quantity;
                 $productDiscount = 0;
-                if ($couponType == 'fixed') {
+                if ($couponType == 'fixed_cart_discount') {
                     $productDiscount = $coupon->coupon_amount;
-                } else {
+                } else if ($couponType == 'percentage_discount') {
                     $productDiscount = $productTotalAmount * $coupon->coupon_amount / 100;
                 }
                 $discountBreakdown[] = [
@@ -186,9 +186,9 @@ trait CanHandleCoupon
             ];
         }
 
-        if ($couponType == 'fixed') {
+        if ($couponType == 'fixed_cart_discount') {
             $discount = $coupon->coupon_amount;
-        } else {
+        } else if ($couponType == 'percentage_discount') {
             $discount = $total_amount * $coupon->coupon_amount / 100;
         }
 

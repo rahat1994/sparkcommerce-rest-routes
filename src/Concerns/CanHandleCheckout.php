@@ -12,7 +12,7 @@ use Rahat1994\SparkcommerceRestRoutes\Http\Resources\SCOrderResource;
 
 trait CanHandleCheckout
 {
-    protected function checkoutWithItems($request, $user, $discountAmount = 0)
+    protected function checkoutWithItems($request, $user, $discountArray = null)
     {
         try {
             // Assuming you have a Cart model and it's already filled with items
@@ -21,9 +21,10 @@ trait CanHandleCheckout
 
             $totalAmount = 0;
 
-            // $items = $this->beforeProcessingCheckoutCartItems($items);
+            // this will set te vendorId for the cart items
+            $items = $this->beforeProcessingCheckoutCartItems($items);
             $totalAmount = $this->getCartTotalAmount($cart);
-            $amountAfterDiscount = $totalAmount - $discountAmount;
+            $amountAfterDiscount = $totalAmount - ($discountArray['discount'] ?? 0);
 
             $modified_amount = $this->afterProcessingCheckoutCartItems($items, $amountAfterDiscount);
 
@@ -42,7 +43,7 @@ trait CanHandleCheckout
             // Create a new Order
             $discountData = [
                 'coupon_code' => $request->coupon_code,
-                'discount' => $discountAmount,
+                'discount' => $discountArray['discount'] ?? 0,
                 'total_amount' => $amountAfterDiscount,
             ];
 
@@ -55,7 +56,7 @@ trait CanHandleCheckout
                 'shipping_method' => json_encode($request->shipping_method),
                 'total_amount' => $amountAfterDiscount,
                 'tracking_number' => Str::random(10),
-                'discount' => $discountData,
+                'discount' => json_encode($discountData),
             ];
 
             $orderData = $this->beforeOrderIsSaved($orderData);
