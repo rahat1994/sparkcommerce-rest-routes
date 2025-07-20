@@ -9,7 +9,7 @@ use Exception;
 use Illuminate\Support\Facades\DB;
 use phpDocumentor\Reflection\Types\Boolean;
 use Rahat1994\SparkCommerce\Models\SCCoupon;
-
+use Rahat1994\SparkcommerceRestRoutes\Exceptions\InvalidCouponException;
 trait CanHandleCoupon
 {
 
@@ -35,23 +35,22 @@ trait CanHandleCoupon
         $couponStartDate = $coupon->start_date;
 
         if (Carbon::now()->greaterThan($couponEndDate) || Carbon::now()->lessThan($couponStartDate)) {
-            throw new Exception('Coupon is not valid');
+            throw new InvalidCouponException('Coupon is not valid for the current date');
         }
     }
 
     protected function checkCartTotalCostConstraint($cart, SCCoupon $coupon)
     {
         $cartTotalAmount = $this->getCartTotalAmount($cart);
-        $couponMinimumAmount = $coupon->minimum_amount;
+        $couponMinimumAmount = $coupon->min_spend;
 
         if ($couponMinimumAmount !== null && $cartTotalAmount < $couponMinimumAmount) {
-            throw new Exception('Cart total amount is less than the minimum amount required for the coupon. Minimum amount required: ' . $couponMinimumAmount);
+            throw new InvalidCouponException('Cart total amount is less than the minimum amount required for the coupon. Minimum amount required: ' . $couponMinimumAmount);
         }
 
-        $couponMaximumAmount = $coupon->maximum_amount;
-
+        $couponMaximumAmount = $coupon->max_spend;
         if ($couponMaximumAmount !== null && $cartTotalAmount > $couponMaximumAmount) {
-            throw new Exception('Cart total amount is greater than the maximum amount required for the coupon. Maximum amount allowed: ' . $couponMaximumAmount);
+            throw new InvalidCouponException('Cart total amount is greater than the maximum amount required for the coupon. Maximum amount allowed: ' . $couponMaximumAmount);
         }
     }
 
@@ -166,6 +165,12 @@ trait CanHandleCoupon
                 }
 
                 $product = $cartItem->itemable;
+
+                // Check if the coupon excludes sale items and if this product is on sale
+                if ($coupon->exclude_sale_items && $this->isProductOnSale($product)) {
+                    continue;
+                }
+
                 $productTotalAmount = $product->getPrice() * $cartItem->quantity;
                 $productDiscount = 0;
                 if ($couponType == 'fixed_cart_discount') {
@@ -186,13 +191,50 @@ trait CanHandleCoupon
             ];
         }
 
+        // For non-product-specific coupons, calculate eligible amount excluding sale items if needed
+        $eligibleAmount = $total_amount;
+        if ($coupon->exclude_sale_items) {
+            $eligibleAmount = $this->getEligibleAmountExcludingSaleItems($cart);
+        }
+
         if ($couponType == 'fixed_cart_discount') {
             $discount = $coupon->coupon_amount;
         } else if ($couponType == 'percentage_discount') {
-            $discount = $total_amount * $coupon->coupon_amount / 100;
+            $discount = $eligibleAmount * $coupon->coupon_amount / 100;
         }
 
         return $discount;
+    }
+
+    /**
+     * Check if a product is on sale by comparing sale_price and regular_price
+     */
+    protected function isProductOnSale($product): bool
+    {
+        return $product->sale_price !== null &&
+               $product->regular_price !== null &&
+               $product->sale_price < $product->regular_price;
+    }
+
+    /**
+     * Calculate total cart amount excluding sale items
+     */
+    protected function getEligibleAmountExcludingSaleItems(Cart $cart): float
+    {
+        $eligibleAmount = 0;
+
+        foreach ($cart->items as $cartItem) {
+            $product = $cartItem->itemable;
+
+            // Skip sale items
+            if ($this->isProductOnSale($product)) {
+                continue;
+            }
+
+            $eligibleAmount += $product->getPrice() * $cartItem->quantity;
+        }
+
+        return $eligibleAmount;
     }
 
     protected function removeCoupon($cart, SCCoupon $coupon)

@@ -11,7 +11,6 @@ use Illuminate\Http\Request;
 use Log;
 use Rahat1994\SparkCommerce\Concerns\CanUseDatabaseTransactions;
 use Rahat1994\SparkCommerce\Models\SCAnonymousCart;
-use Rahat1994\SparkCommerce\Models\SCProduct;
 use Rahat1994\SparkcommerceMultivendorRestRoutes\Exceptions\VendorNotSameException;
 use Rahat1994\SparkcommerceRestRoutes\Concerns\CanHandleAnonymousCart;
 use Rahat1994\SparkcommerceRestRoutes\Concerns\CanHandleCart;
@@ -20,7 +19,9 @@ use Rahat1994\SparkcommerceRestRoutes\Concerns\CanHandleCoupon;
 use Rahat1994\SparkcommerceRestRoutes\Concerns\CanRetriveUser;
 use Rahat1994\SparkcommerceRestRoutes\Http\Controllers\SCBaseController;
 use Illuminate\Support\Facades\Validator;
-
+use Rahat1994\SparkCommerce\Models\SCCoupon;
+use Rahat1994\SparkCommerce\Models\SCProduct;
+use Rahat1994\SparkcommerceRestRoutes\Exceptions\InvalidCouponException;
 class CartController extends SCBaseController
 {
     use CanUseDatabaseTransactions;
@@ -327,8 +328,45 @@ class CartController extends SCBaseController
             $couponResult = $this->validateAndApplyCoupon($user, $request->coupon_code);
             $discountArray = $couponResult['discount'];
             return $this->checkoutWithItems($request, $user, $discountArray);
-        } catch (\Throwable $th) {
+        }
+        catch(ModelNotFoundException $exception) {
+
+            $model = $exception->getModel();
+            if ($model === SCProduct::class) {
+                return response()->json(
+                    [
+                        'message' => 'Product not found',
+                    ],
+                    404
+                );
+            }
+            elseif ($model === SCCoupon::class) {
+                return response()->json(
+                    [
+                        'message' => 'Coupon not found',
+                    ],
+                    404
+                );
+            }
+        }
+        catch (InvalidCouponException $exception) {
+            return response()->json(
+                [
+                    'message' => $exception->getMessage(),
+                ],
+                400
+            );
+        }
+        catch (\Throwable $th) {
             Log::error($th);
+            if($th->getMessage() === 'Cart is empty or does not have items with vendor information') {
+                return response()->json(
+                    [
+                        'message' => $th->getMessage(),
+                    ],
+                    400
+                );
+            }
             return response()->json(
                 [
                     // TODO: Add a better message and internatiolization.
