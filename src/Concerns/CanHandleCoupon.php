@@ -49,6 +49,11 @@ trait CanHandleCoupon
         }
 
         $couponMaximumAmount = $coupon->max_spend;
+
+        if ($couponMaximumAmount === 0) {
+            # code...
+            throw new InvalidCouponException('Cart total amount is greater than the maximum amount required for the coupon. Maximum amount allowed: ' . $couponMaximumAmount);
+        }
         if ($couponMaximumAmount !== null && $cartTotalAmount > $couponMaximumAmount) {
             throw new InvalidCouponException('Cart total amount is greater than the maximum amount required for the coupon. Maximum amount allowed: ' . $couponMaximumAmount);
         }
