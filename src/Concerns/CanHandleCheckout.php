@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Rahat1994\SparkCommerce\Models\SCOrder;
 use Rahat1994\SparkcommerceRestRoutes\Http\Resources\SCOrderResource;
-
+use Illuminate\Support\Arr;
 trait CanHandleCheckout
 {
     protected function checkoutWithItems($request, $user, $discountArray = null)
@@ -27,10 +27,12 @@ trait CanHandleCheckout
             // dd($totalAmount);
             $amountAfterDiscount = $totalAmount - ($discountArray['discount'] ?? 0);
 
-            $modified_amount = $this->afterProcessingCheckoutCartItems($items, $amountAfterDiscount);
+            $modified_amount_info = $this->afterProcessingCheckoutCartItems($items, $amountAfterDiscount);
+            $modified_amount = Arr::get($modified_amount_info, 'amount', $amountAfterDiscount);
 
             if ($amountAfterDiscount != $modified_amount && is_numeric($modified_amount)) {
                 $amountAfterDiscount = $modified_amount;
+                $priceModificationMeta = Arr::get($modified_amount_info, 'meta', []);
             }
 
             if (!$cart || $cart->items->isEmpty()) {
@@ -57,7 +59,14 @@ trait CanHandleCheckout
                 'shipping_method' => json_encode($request->shipping_method),
                 'total_amount' => $amountAfterDiscount,
                 'tracking_number' => Str::random(10),
-                'discount' => json_encode($discountData),
+                'discount' => $discountData,
+                'meta' => [
+                    'local' => 'local',
+                    'price_modification' => $priceModificationMeta ?? [],
+                ],
+                'payment_method' => $request->payment_method,
+                'payment_status' => 'pending',
+                'shipping_status' => 'pending',
             ];
 
             $orderData = $this->beforeOrderIsSaved($orderData);
