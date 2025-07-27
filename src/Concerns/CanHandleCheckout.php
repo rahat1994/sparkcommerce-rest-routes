@@ -24,6 +24,7 @@ trait CanHandleCheckout
             // this will set te vendorId for the cart items
             $items = $this->beforeProcessingCheckoutCartItems($items);
             $totalAmount = $this->getCartTotalAmount($cart);
+            // dd($totalAmount);
             $amountAfterDiscount = $totalAmount - ($discountArray['discount'] ?? 0);
 
             $modified_amount = $this->afterProcessingCheckoutCartItems($items, $amountAfterDiscount);

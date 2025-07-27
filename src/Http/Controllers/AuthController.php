@@ -26,13 +26,22 @@ class AuthController extends SCBaseController
         if (Auth::attempt($loginData)) {
 
             $user = $this->singleModelResource(Auth::user(), User::class);
-            $response = [
-                'user' => $user,
-                'token' => Auth::user()->createToken($request->device_name)->plainTextToken
-            ];
+
+            if($user->scMVVendors()->count() !== 0){
+                // User has associated vendors
+                $response = [
+                    'message' => 'User is a vendor',
+                ];
+            } else {
+                $response = [
+                    'user' => $user,
+                    'token' => Auth::user()->createToken($request->device_name)->plainTextToken
+                ];
+            }
+
             $this->callHook('afterLogin', $request);
             return response()->json($response, 200);
-            
+
         }
 
         return response()->json([
@@ -181,12 +190,9 @@ class AuthController extends SCBaseController
                 'required',
                 PasswordRule::min(8)
                     ->mixedCase()
-                    ->numbers()
-                    ->symbols()
                     ->uncompromised(),
             ],
         ]);
-
         try {
             $this->callHook('beforePasswordUpdate', $request);
             if (!Hash::check($request->current_password, $request->user()->password)) {

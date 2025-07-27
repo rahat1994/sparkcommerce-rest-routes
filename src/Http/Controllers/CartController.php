@@ -22,6 +22,8 @@ use Illuminate\Support\Facades\Validator;
 use Rahat1994\SparkCommerce\Models\SCCoupon;
 use Rahat1994\SparkCommerce\Models\SCProduct;
 use Rahat1994\SparkcommerceRestRoutes\Exceptions\InvalidCouponException;
+use Rahat1994\SparkcommerceRestRoutes\Exceptions\OrderAmountException;
+
 class CartController extends SCBaseController
 {
     use CanUseDatabaseTransactions;
@@ -350,6 +352,14 @@ class CartController extends SCBaseController
             }
         }
         catch (InvalidCouponException $exception) {
+            return response()->json(
+                [
+                    'message' => $exception->getMessage(),
+                ],
+                400
+            );
+        }
+        catch (OrderAmountException $exception) {
             return response()->json(
                 [
                     'message' => $exception->getMessage(),
