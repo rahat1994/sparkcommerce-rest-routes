@@ -21,6 +21,7 @@ class SCOrderResource extends JsonResource
             'tracking_number' => $this->tracking_number,
             'payment_method' => $this->payment_method,
             'transaction_id' => $this->transaction_id,
+            'meta' => $this->meta,
             'created_at' => $this->created_at
         ];
     }
