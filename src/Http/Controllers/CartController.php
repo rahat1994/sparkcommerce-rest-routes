@@ -258,6 +258,7 @@ class CartController extends SCBaseController
                     'message' => 'Valid Coupon',
                     'cart' => $result['cart'],
                     'discount' => $result['discount'],
+                    'notes' => $result['notes'] ?? []
                 ],
                 200
             );
@@ -295,12 +296,14 @@ class CartController extends SCBaseController
         $this->checkCouponUsageLimit($couponData);
         $this->checkUsageLimitPerUser($user, $couponData);
         $this->checkCouponIncludedProducts($cart, $couponData);
+
         $totalAmount = $this->getCartTotalAmount($cart);
 
         $discount = $this->calculateDiscount($totalAmount, $couponData, $cart);
         return [
             'cart' => $cart,
             'discount' => $discount,
+            'notes' => $this->notes
         ];
     }
 
@@ -328,7 +331,7 @@ class CartController extends SCBaseController
 
         try {
             $couponResult = $this->validateAndApplyCoupon($user, $request->coupon_code);
-            $discountArray = $couponResult['discount'];
+            $discountArray = $couponResult;
             return $this->checkoutWithItems($request, $user, $discountArray);
         }
         catch(ModelNotFoundException $exception) {

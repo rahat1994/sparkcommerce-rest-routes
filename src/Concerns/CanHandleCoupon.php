@@ -14,6 +14,7 @@ trait CanHandleCoupon
 {
 
     protected $isCouponProductSpecific = false;
+    public array $notes = [];
 
     protected function couponData(string $couponCode): SCCoupon
     {
@@ -29,12 +30,23 @@ trait CanHandleCoupon
         return $conditions;
     }
 
+
+
     protected function checkDateConstraint(SCCoupon $coupon)
     {
         $couponEndDate = $coupon->end_date;
         $couponStartDate = $coupon->start_date;
 
-        if (Carbon::now()->greaterThan($couponEndDate) || Carbon::now()->lessThan($couponStartDate)) {
+        // If both dates are null, skip the check
+        if (is_null($couponEndDate) && is_null($couponStartDate)) {
+            return;
+        }
+
+        if (!is_null($couponEndDate) && Carbon::now()->greaterThan($couponEndDate)) {
+            throw new InvalidCouponException('Coupon is not valid for the current date');
+        }
+
+        if (!is_null($couponStartDate) && Carbon::now()->lessThan($couponStartDate)) {
             throw new InvalidCouponException('Coupon is not valid for the current date');
         }
     }
@@ -57,6 +69,11 @@ trait CanHandleCoupon
         if ($couponMaximumAmount !== null && $cartTotalAmount > $couponMaximumAmount) {
             throw new InvalidCouponException('Cart total amount is greater than the maximum amount required for the coupon. Maximum amount allowed: ' . $couponMaximumAmount);
         }
+    }
+
+    protected function checkIfCouponShouldExcludeSaleItems(SCCoupon $coupon): bool
+    {
+        return $coupon->exclude_sale_items;
     }
 
     protected function checkCouponUsageLimit($coupon)
@@ -170,9 +187,9 @@ trait CanHandleCoupon
                 }
 
                 $product = $cartItem->itemable;
-
                 // Check if the coupon excludes sale items and if this product is on sale
                 if ($coupon->exclude_sale_items && $this->isProductOnSale($product)) {
+                    $this->notes[] = "Coupon '{$coupon->code}' cannot be applied to sale item '{$product->name}'.";
                     continue;
                 }
 
@@ -233,6 +250,7 @@ trait CanHandleCoupon
 
             // Skip sale items
             if ($this->isProductOnSale($product)) {
+                $this->notes[] = "Coupon cannot be applied to sale item '{$product->name}'.";
                 continue;
             }
 
