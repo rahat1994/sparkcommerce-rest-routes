@@ -123,10 +123,8 @@ trait CanHandleAnonymousCart
             );
         }        
         catch (\Throwable $th) {
-            dd($th);
             return response()->json(
                 [
-                    // TODO:: change the message and apply localization
                     'message' => 'Something went wrong',
                 ],
                 400
