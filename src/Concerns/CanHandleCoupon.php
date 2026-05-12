@@ -78,24 +78,30 @@ trait CanHandleCoupon
 
     protected function checkCouponUsageLimit($coupon)
     {
-        // $couponUsageLimit = $coupon->usage_limit;
+        $couponUsageLimit = $coupon->usage_limit;
 
-        // if ($couponUsageLimit !== 0 && $couponUsageLimit <= $coupon->usage_count) {
-        //     throw new Exception('Coupon usage limit has been reached');
-        // }
+        if ($couponUsageLimit !== null && $couponUsageLimit > 0 && $coupon->usage_count >= $couponUsageLimit) {
+            throw new InvalidCouponException('Coupon usage limit has been reached');
+        }
     }
 
     protected function checkUsageLimitPerUser(User $user, SCCoupon $coupon)
     {
+        $limitPerUser = $coupon->usage_limit_per_user;
 
-        // DB::table('coupon_user')
-        //     ->where('coupon_id', $coupon->id)
-        //     ->where('user_id', $user->id)->select('usage_count')->first();
-        // if the user has used the coupon more than the usage limit per user, throw an exception
+        if ($limitPerUser === null || $limitPerUser <= 0) {
+            return;
+        }
 
-        // if ($couponUsageLimit !== 0 && $couponUsageLimit <= $couponUsageLimit) {
-        //     throw new Exception('Coupon usage limit per user has been reached');
-        // }
+        $couponUserTable = config('sparkcommerce.table_prefix') . config('sparkcommerce.coupon_user_table_name');
+        $userUsageCount = DB::table($couponUserTable)
+            ->where('coupon_id', $coupon->id)
+            ->where('user_id', $user->id)
+            ->value('usage_count') ?? 0;
+
+        if ($userUsageCount >= $limitPerUser) {
+            throw new InvalidCouponException('You have reached the usage limit for this coupon');
+        }
     }
 
     protected function checkCouponIncludedProducts($cart, SCCoupon $coupon)
