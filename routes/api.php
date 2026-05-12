@@ -6,7 +6,6 @@ use Rahat1994\SparkcommerceRestRoutes\Http\Controllers\CartController;
 use Rahat1994\SparkcommerceRestRoutes\Http\Controllers\CategoryController;
 use Rahat1994\SparkcommerceRestRoutes\Http\Controllers\ProductController;
 
-use function Pest\Laravel\post;
 
 Route::group(['prefix' => 'sc/v1'], function () {
     Route::post('/login', [AuthController::class, 'login']);
@@ -18,7 +17,7 @@ Route::group(['prefix' => 'sc/v1'], function () {
         Route::get('/me', [AuthController::class, 'me']);
         Route::post('/confirm-password', [AuthController::class, 'confirmPassword']);
         Route::post('/update-password', [AuthController::class, 'updatePassword']);
-        Route::post('/update-profile ', [AuthController::class, 'updateProfile']);
+        Route::post('/update-profile', [AuthController::class, 'updateProfile']);
         Route::post('/logout', [AuthController::class, 'logout']);
     });
 
