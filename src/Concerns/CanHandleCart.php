@@ -82,8 +82,11 @@ trait CanHandleCart
             $user = $this->user();
 
             $cart = $this->getUserCart($user->id);
-            $cartItem = $cart->items()->where('itemable_id', $product->id)->get();
-            $cart->removeItem($cartItem[0]);
+            $cartItem = $cart->items()->where('itemable_id', $product->id)->first();
+            if (! $cartItem) {
+                return response()->json(['message' => 'Product not found in cart'], 404);
+            }
+            $cart->removeItem($cartItem);
 
             $cart = $this->loadCartWithAllItems($cart);
 
