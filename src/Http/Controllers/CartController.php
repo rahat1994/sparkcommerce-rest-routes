@@ -391,7 +391,8 @@ class CartController extends SCBaseController
         }
     }
 
-    public function afterOrderIsSaved($order){
-
+    public function afterOrderIsSaved($order)
+    {
+        return $order;
     }
 }
