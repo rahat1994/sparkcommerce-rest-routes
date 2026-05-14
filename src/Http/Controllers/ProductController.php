@@ -26,7 +26,7 @@ class ProductController extends SCBaseController
                 : explode(',', $request->get('categories', ''));
 
             if (empty($categorySlugs)) {
-                $this->getProducts($request);
+                return $this->getProducts($request);
             }
 
             $products = $this->recordModel::with('categories')

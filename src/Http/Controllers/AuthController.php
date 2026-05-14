@@ -25,9 +25,10 @@ class AuthController extends SCBaseController
         $loginData = $data ?? $request->only('email', 'password');
         if (Auth::attempt($loginData)) {
 
-            $user = $this->singleModelResource(Auth::user(), User::class);
+            $authUser = Auth::user();
+            $user = $this->singleModelResource($authUser, User::class);
 
-            if($user->scMVVendors()->count() !== 0){
+            if ($authUser->scMVVendors()->count() !== 0) {
                 // User has associated vendors
                 $response = [
                     'message' => 'User is a vendor',
@@ -35,7 +36,7 @@ class AuthController extends SCBaseController
             } else {
                 $response = [
                     'user' => $user,
-                    'token' => Auth::user()->createToken($request->device_name)->plainTextToken
+                    'token' => $authUser->createToken($request->device_name)->plainTextToken
                 ];
             }
 
